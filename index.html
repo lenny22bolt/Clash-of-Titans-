@@ -1361,28 +1361,83 @@ function clearDraftOv() { if(confirm('Clear all overrides?')){ sessionStorage.re
 
 // ── TREASURY ──────────────────────────────────────────────────
 var MANAGERS = [
-  {name:"IceMonkey",emoji:"❄️",paid:true},{name:"Fenrir's Fury",emoji:"🐺",paid:true},
-  {name:"Warrior Shohei Goatani",emoji:"🥷",paid:true},{name:"Orion Leaf",emoji:"🍁",paid:true},
-  {name:"Hermes Hail Marys",emoji:"🪽",paid:true},{name:"Wrath of Moctezuma",emoji:"🔥",paid:true},
-  {name:"Beercules the Destroyer",emoji:"🍺",paid:true},{name:"Stefanos the Spartan King",emoji:"🪖",paid:false},
-  {name:"Lord of Dreams",emoji:"🔮",paid:true},{name:"Notchotaur",emoji:"🐂",paid:true},
-  {name:"Lord Jefita Clapper",emoji:"🩴",paid:true},{name:"Talon",emoji:"🪄",paid:true},
-  {name:"ChatG-TDs",emoji:"🤖",paid:true},{name:"Dewie Slayer of Bakunawa",emoji:"🐍",paid:true},
-  {name:"Son of Rander",emoji:"🌳",paid:true},{name:"Heir of Zeus",emoji:"⚡",paid:true}
+  {name:"IceMonkey",             username:"IceMonkey",      emoji:"❄️", paid:true},
+  {name:"Fenrir's Fury",         username:"FenrirsFury",    emoji:"🐺", paid:true},
+  {name:"Warrior Shohei Goatani",username:"mcsteven7766",   emoji:"🥷", paid:true},
+  {name:"Orion Leaf",            username:"vandavey",       emoji:"🍁", paid:true},
+  {name:"Hermes Hail Marys",     username:"Dsides",         emoji:"🪽", paid:true},
+  {name:"Wrath of Moctezuma",    username:"Moctezuma",      emoji:"🔥", paid:true},
+  {name:"Beercules the Destroyer",username:"isaiahsc23",    emoji:"🍺", paid:true},
+  {name:"Stefanos the Spartan King",username:"StefanSandalis",emoji:"🪖",paid:false},
+  {name:"Lord of Dreams",        username:"LordofDreams",   emoji:"🔮", paid:true},
+  {name:"Notchotaur",            username:"Notchanator",    emoji:"🐂", paid:true},
+  {name:"Lord Jefita Clapper",   username:"Peanutzm3",      emoji:"🩴", paid:true},
+  {name:"Talon",                 username:"HiLine",         emoji:"🪄", paid:true},
+  {name:"ChatG-TDs",             username:"SteveG25",       emoji:"🤖", paid:true},
+  {name:"Dewie Slayer of Bakunawa",username:"dewdaddy",     emoji:"🐍", paid:true},
+  {name:"Son of Rander",         username:"JTree12",        emoji:"🌳", paid:true},
+  {name:"Heir of Zeus",          username:"lennylee22",     emoji:"⚡", paid:true}
 ];
 
+// ── SUPABASE ──────────────────────────────────────────────────
+var SB_URL = 'https://mlpwcwqmxungvbsfkfjb.supabase.co';
+var SB_KEY = 'sb_publishable_UnOF4zXjn_V324h_Vc7usQ_GDoFujpM';
+var SB = null; // will be set when library loads
+
+function sbReady() { return SB !== null; }
+
+async function sbFetch(table, options) {
+  if (!sbReady()) return null;
+  try {
+    var q = SB.from(table).select('*');
+    if (options && options.eq) q = q.eq(options.eq[0], options.eq[1]);
+    if (options && options.order) q = q.order(options.order[0], {ascending: options.order[1]});
+    var res = await q;
+    if (res.error) throw res.error;
+    return res.data;
+  } catch(e) { console.warn('Supabase fetch ['+table+']:', e.message); return null; }
+}
+
+async function sbUpsert(table, data, conflict) {
+  if (!sbReady()) return false;
+  try {
+    var opts = conflict ? {onConflict: conflict} : {};
+    var res = await SB.from(table).upsert(data, opts);
+    if (res.error) throw res.error;
+    return true;
+  } catch(e) { console.warn('Supabase upsert ['+table+']:', e.message); return false; }
+}
+
+// ── TREASURY LOCAL FALLBACK ────────────────────────────────────
 function getTreasury() { return parseFloat(localStorage.getItem('treasury')||'160'); }
-function setTreasury(v) { localStorage.setItem('treasury', v); }
+function setTreasuryLocal(v) { localStorage.setItem('treasury', v); }
+
+// Sync paid status from Supabase into MANAGERS array
+function applyTreasuryData(rows) {
+  if (!rows || !rows.length) return;
+  rows.forEach(function(row) {
+    var m = MANAGERS.find(function(x){ return x.username === row.username || x.name === row.team_name; });
+    if (m) m.paid = !!row.paid;
+    if (row.balance != null && row.username === 'lennylee22') {
+      setTreasuryLocal(row.balance);
+    }
+  });
+}
 
 function renderTreasury() {
   var wrap = document.getElementById('treasurywrap');
   var amt  = getTreasury();
   var paid = MANAGERS.filter(function(m){return m.paid;}).length;
+
+  var syncIndicator = sbReady()
+    ? '<span style="font-size:9px;color:var(--green);font-family:Cinzel,serif;letter-spacing:1px">● LIVE SYNC</span>'
+    : '<span style="font-size:9px;color:var(--amber);font-family:Cinzel,serif;letter-spacing:1px">○ LOCAL</span>';
+
   var html = '<div class="treasury-hero">'
     + '<div style="font-family:Cinzel Decorative,serif;font-size:14px;color:var(--gold);letter-spacing:3px;margin-bottom:.5rem">⚔ TITAN TREASURY ⚔</div>'
     + '<div class="treasury-amount">$'+amt.toFixed(2)+'</div>'
     + '<div style="font-size:12px;color:var(--dim);margin-top:8px;font-family:Cinzel,serif;letter-spacing:1px">Held on Kraken · $10/manager/season · 5% withdrawable per champion<br>'
-    + '<strong style="color:var(--gold)">'+paid+'/16</strong> tributes paid this season</div>'
+    + '<strong style="color:var(--gold)">'+paid+'/16</strong> tributes paid this season &nbsp;'+syncIndicator+'</div>'
     + '<div style="display:flex;gap:10px;justify-content:center;margin-top:1rem;flex-wrap:wrap">'
     + '<button onclick="updateTreasury()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:8px 20px;border-radius:20px;border:1px solid var(--gold-border);background:transparent;color:var(--gold);cursor:pointer">✏ Update Balance</button>'
     + '<a href="https://www.kraken.com/u/AA63N84GWGPCA4UY" target="_blank" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:8px 20px;border-radius:20px;border:1px solid rgba(123,184,232,.3);color:var(--blue);text-decoration:none">🔗 View on Kraken</a>'
@@ -1397,20 +1452,48 @@ function renderTreasury() {
 
   html += '<div class="stitle">Season 2 Tribute Status</div>';
   MANAGERS.forEach(function(m) {
-    html += '<div class="contrib-row"><span style="font-size:18px">'+m.emoji+'</span>'
+    html += '<div class="contrib-row" style="cursor:pointer" onclick="togglePaid(\''+m.username+'\',\''+m.name+'\')">'
+      + '<span style="font-size:18px">'+m.emoji+'</span>'
       + '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:600;color:var(--text);flex:1">'+m.name+'</div>'
       + '<div style="font-family:Cinzel,serif;font-size:13px;font-weight:700;color:var(--gold)">$10</div>'
       + '<span class="'+(m.paid?'cs-paid':'cs-pending')+'">'+(m.paid?'✓ Paid':'Pending')+'</span>'
       + '</div>';
   });
+
+  html += '<div style="margin-top:12px;font-size:10px;color:var(--dim);font-family:Cinzel,serif;text-align:center;font-style:italic">Commissioner: tap any row to toggle paid status</div>';
   wrap.innerHTML = html;
 }
 
-function updateTreasury() {
+async function togglePaid(username, teamName) {
+  var m = MANAGERS.find(function(x){ return x.username === username; });
+  if (!m) return;
+  var newPaid = !m.paid;
+  m.paid = newPaid;
+  renderTreasury();
+  // Sync to Supabase
+  await sbUpsert('treasury', {
+    username: username,
+    team_name: teamName,
+    paid: newPaid,
+    updated_at: new Date().toISOString()
+  }, 'username');
+}
+
+async function updateTreasury() {
   var v = prompt('Update Treasury balance ($):', getTreasury().toFixed(2));
   if (v === null) return;
   var n = parseFloat(v);
-  if (!isNaN(n) && n >= 0) { setTreasury(n); renderTreasury(); }
+  if (!isNaN(n) && n >= 0) {
+    setTreasuryLocal(n);
+    renderTreasury();
+    // Sync balance to Supabase under commissioner account
+    await sbUpsert('treasury', {
+      username: 'lennylee22',
+      team_name: 'Heir of Zeus',
+      balance: n,
+      updated_at: new Date().toISOString()
+    }, 'username');
+  }
 }
 
 // ── FALLEN WARRIORS ───────────────────────────────────────────
@@ -2249,16 +2332,33 @@ function spinWheel() {
     wheel.style.transform='rotate('+finalAngle+'deg)';
   }
 
-  setTimeout(function() {
+  setTimeout(async function() {
     // Ask which manager is spinning
     var manager = prompt('Which manager is spinning? (Enter your team name)', 'Your team name');
     if (!manager) manager = 'Unknown Manager';
 
     var today = new Date().toDateString();
+    var todayISO = new Date().toISOString().split('T')[0];
     var history = getWheelHistory();
     history.push({ manager:manager, val:result.val, date:today });
     saveWheelHistory(history);
     setLastSpin(today);
+
+    // Find username from team name
+    var mgr = MANAGERS.find(function(m){ return m.name === manager; });
+    var username = mgr ? mgr.username : manager;
+
+    // Save to Supabase
+    if (sbReady()) {
+      await sbUpsert('wheel_spins', {
+        username: username,
+        team_name: manager,
+        spin_date: todayISO,
+        faab_won: result.val,
+        spin_result: '$'+result.val+' FAAB',
+        created_at: new Date().toISOString()
+      }, 'username,spin_date');
+    }
 
     var msg = result.val===0 ? 'Tough luck! $0 FAAB today — try again tomorrow.' :
               result.val===5 ? 'JACKPOT! +$5 FAAB! The realm blesses you!' :
@@ -2346,6 +2446,46 @@ Promise.all([
     document.getElementById('hmeta').textContent = 'Preview mode · Open in browser for live data';
   }
 });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+// ── SUPABASE INIT ──────────────────────────────────────────────
+(function() {
+  try {
+    if (typeof supabase !== 'undefined' && supabase.createClient) {
+      SB = supabase.createClient(SB_URL, SB_KEY);
+      console.log('✅ Supabase client initialized');
+      // Load treasury data from Supabase on startup
+      SB.from('treasury').select('*').then(function(res) {
+        if (!res.error && res.data && res.data.length) {
+          applyTreasuryData(res.data);
+          renderTreasury();
+          console.log('✅ Treasury synced from Supabase ('+res.data.length+' rows)');
+        }
+      });
+      // Load wheel history from Supabase and merge with local
+      SB.from('wheel_spins').select('*').order('created_at', {ascending:false}).then(function(res) {
+        if (!res.error && res.data && res.data.length) {
+          var sbHistory = res.data.map(function(row) {
+            return { manager: row.team_name || row.username, val: row.faab_won, date: new Date(row.created_at).toDateString() };
+          });
+          var local = getWheelHistory();
+          var seen = {};
+          var merged = sbHistory.concat(local).filter(function(h) {
+            var key = h.manager+'|'+h.date;
+            if (seen[key]) return false;
+            seen[key] = true; return true;
+          });
+          saveWheelHistory(merged);
+          renderWheel();
+          console.log('✅ Wheel history synced from Supabase ('+res.data.length+' spins)');
+        }
+      });
+    }
+  } catch(e) {
+    console.warn('Supabase init failed:', e.message);
+  }
+})();
 </script>
 <script>
 if ('serviceWorker' in navigator) {
