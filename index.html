@@ -1601,21 +1601,32 @@ function renderRealmMap() {
     4:{name:"Primordial West",cx:148,cy:450,rx:130,ry:190,color:"#FF6B6B"}
   };
 
+  // Hardcoded division assignments (Sleeper div IDs may vary)
+  var TEAM_DIVS = {
+    "IceMonkey":1,"Fenrir's Fury":1,"Warrior Shohei Goatani":1,"Orion Leaf":1,
+    "Hermes Hail Marys":2,"Wrath of Moctezuma":2,"Beercules the Destroyer":2,"Stefanos the Spartan King":2,
+    "Lord of Dreams":3,"Notchotaur":3,"Lord Jefita Clapper":3,"Talon":3,
+    "ChatG-TDs":4,"Dewie Slayer of Bakunawa":4,"Son of Rander":4,"Heir of Zeus":4
+  };
+
   var winMap = {};
   S.rosters.forEach(function(r){
-    var u=getUser(r.owner_id), tn=tname(r,u);
+    var u=getUser(r.owner_id), tn=resolveTeamName(r,u);
     winMap[tn]=(r.settings&&r.settings.wins)||0;
   });
+
   var divTotalWins={1:0,2:0,3:0,4:0};
   var divTeams={1:[],2:[],3:[],4:[]};
-  S.rosters.forEach(function(r){
-    var d=(r.settings&&r.settings.division)||1;
-    var u=getUser(r.owner_id), tn=tname(r,u);
-    var w=(r.settings&&r.settings.wins)||0;
+
+  // Build divTeams from hardcoded map — guaranteed all 4 divisions populated
+  Object.keys(TEAM_DIVS).forEach(function(tn){
+    var d = TEAM_DIVS[tn];
+    var w = winMap[tn]||0;
     divTotalWins[d]+=w;
-    divTeams[d].push({name:tn,wins:w,color:TEAM_COLORS[tn]||'#888888'});
+    divTeams[d].push({name:tn, wins:w, color:TEAM_COLORS[tn]||'#888888'});
   });
-  var seasonStarted=Object.values(winMap).some(function(w){return w>0;});
+
+  var seasonStarted=Object.keys(winMap).some(function(k){return winMap[k]>0;});
 
   function buildTerritoryBlobs(divNum){
     var div=DIVS[divNum], teams=divTeams[divNum]||[], total=divTotalWins[divNum];
@@ -1735,43 +1746,72 @@ function renderRealmMap() {
     var tip=document.getElementById('rtt');
     var inner=document.getElementById('mapInner');
     if(!tip||!inner) return;
+    function showTip(node) {
+      var tn2=node.dataset.tn;
+      // Find roster using hardcoded division map for reliability
+      var r=S.rosters.find(function(ro){
+        var u=getUser(ro.owner_id);
+        return resolveTeamName(ro,u)===tn2||tname(ro,u)===tn2;
+      });
+      var u=r?getUser(r.owner_id):{};
+      var w=r&&r.settings?r.settings.wins||0:0;
+      var l=r&&r.settings?r.settings.losses||0:0;
+      var pts=r&&r.settings?(((r.settings.fpts||0)+(r.settings.fpts_decimal||0)/100).toFixed(1)):'0.0';
+      var s1r=getS1ByTeamName(tn2)||getS1(u);
+      var divNum=TEAM_DIVS[tn2]||1;
+      var divTotal=divTotalWins[divNum]||0;
+      var share=divTotal>0?Math.round((w/divTotal)*100):0;
+      var s1Line=s1r
+        ?'<br><span style="color:var(--gold);font-weight:600">S1: '+s1r.w+'-'+s1r.l+' · '+s1r.pts.toFixed(1)+' PF</span>'
+         +(s1r.result==='champion'?' <span style="color:#B8F0FF">🏆 Champion</span>':'')
+         +(s1r.result==='runner-up'?' <span style="color:#C0C0C0">🥈 Runner-Up</span>':'')
+         +(s1r.result==='third'?' <span style="color:#CD7F32">🥉 Third</span>':'')
+        :'<br><span style="color:var(--amber);font-size:10px">S1: Inaugural Season</span>';
+      document.getElementById('rttName').textContent=tn2;
+      document.getElementById('rttRec').innerHTML=
+        '<span style="color:var(--dim);font-size:10px;font-family:Cinzel,serif;letter-spacing:1px">SEASON 2</span>'
+        +'<br>'+w+'-'+l+' · '+pts+' pts'
+        +(seasonStarted&&divTotal>0?' · ~'+share+'% territory':'')
+        +'<br><span style="color:var(--dim);font-size:10px;font-family:Cinzel,serif;letter-spacing:1px">SEASON 1</span>'
+        +s1Line
+        +'<br><span style="font-size:10px;color:var(--dim)">'+(u.display_name||'')+'</span>';
+      var ir=inner.getBoundingClientRect(),nr=node.getBoundingClientRect();
+      var tipX=nr.left-ir.left+28;
+      var tipY=nr.top-ir.top-20;
+      // Keep tooltip on screen
+      tipX=Math.min(tipX, ir.width-180);
+      tipX=Math.max(tipX, 0);
+      tip.style.left=tipX+'px';
+      tip.style.top=tipY+'px';
+      tip.classList.add('show');
+      node.setAttribute('stroke-width','3');
+    }
+
+    function hideTip(node) {
+      tip.classList.remove('show');
+      if(node) node.setAttribute('stroke-width','1.5');
+    }
+
     nodes.forEach(function(node){
-      node.addEventListener('mouseenter',function(){
-        var tn2=node.dataset.tn;
-        var r=S.rosters.find(function(ro){var u=getUser(ro.owner_id);return tname(ro,u)===tn2;});
-        var u=r?getUser(r.owner_id):{};
-        var w=r&&r.settings?r.settings.wins||0:0;
-        var l=r&&r.settings?r.settings.losses||0:0;
-        var pts=r&&r.settings?(((r.settings.fpts||0)+(r.settings.fpts_decimal||0)/100).toFixed(1)):'0.0';
-        var s1r=getS1ByTeamName(tn2)||getS1(u);
-        var divInfo=r&&r.settings&&r.settings.division?DIVS[r.settings.division]:null;
-        var divTotal=divInfo?divTotalWins[r.settings.division]:0;
-        var share=divTotal>0?Math.round((w/divTotal)*100):0;
-        var s1Line=s1r
-          ?'<br><span style="color:var(--gold);font-weight:600">S1: '+s1r.w+'-'+s1r.l+' · '+s1r.pts.toFixed(1)+' PF</span>'
-           +(s1r.result==='champion'?' <span style="color:#B8F0FF">🏆 Champion</span>':'')
-           +(s1r.result==='runner-up'?' <span style="color:#C0C0C0">🥈 Runner-Up</span>':'')
-           +(s1r.result==='third'?' <span style="color:#CD7F32">🥉 Third</span>':'')
-          :'<br><span style="color:var(--amber);font-size:10px">S1: Inaugural Season</span>';
-        document.getElementById('rttName').textContent=tn2;
-        document.getElementById('rttRec').innerHTML=
-          '<span style="color:var(--dim);font-size:10px;font-family:Cinzel,serif;letter-spacing:1px">SEASON 2</span>'
-          +'<br>'+w+'-'+l+' · '+pts+' pts'
-          +(seasonStarted&&divTotal>0?' · ~'+share+'% territory':'')
-          +'<br><span style="color:var(--dim);font-size:10px;font-family:Cinzel,serif;letter-spacing:1px">SEASON 1</span>'
-          +s1Line
-          +'<br><span style="font-size:10px;color:var(--dim)">'+(u.display_name||'')+'</span>';
-        var ir=inner.getBoundingClientRect(),nr=node.getBoundingClientRect();
-        tip.style.left=(nr.left-ir.left+28)+'px';
-        tip.style.top=(nr.top-ir.top-20)+'px';
-        tip.classList.add('show');
-        node.setAttribute('stroke-width','3');
-      });
-      node.addEventListener('mouseleave',function(){
-        tip.classList.remove('show');
-        node.setAttribute('stroke-width','1.5');
-      });
+      // Mouse events (desktop)
+      node.addEventListener('mouseenter', function(){ showTip(node); });
+      node.addEventListener('mouseleave', function(){ hideTip(node); });
+      // Touch events (iOS/Android)
+      node.addEventListener('touchstart', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        // Hide any existing tip first
+        hideTip(null);
+        showTip(node);
+      }, {passive:false});
     });
+
+    // Tap anywhere else to dismiss tooltip on mobile
+    inner.addEventListener('touchstart', function(e){
+      if(!e.target.classList.contains('team-node')){
+        hideTip(null);
+      }
+    }, {passive:true});
   },150);
 }
 
