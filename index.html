@@ -1915,7 +1915,7 @@ function renderRealmMap() {
 
     // ☀ Celestial South (bottom-right quadrant) — coast bottom-right corner
     // Avoid label area: bottom-right ~x:68-92,y:85-96
-    {tn:"Hermes Hail Marys",      x:58, y:58, color:"#FFB347"},  // upper left of south quad
+    {tn:"Hermes Hail Marys",      x:60, y:68, color:"#FFB347"},  // moved south away from center
     {tn:"Wrath of Moctezuma",     x:72, y:64, color:"#FFB347"},  // mid-right south
     {tn:"Beercules the Destroyer", x:62, y:74, color:"#FFB347"}, // center south
     {tn:"Stefanos the Spartan King",x:80,y:72, color:"#FFB347"}  // right side south
@@ -1996,7 +1996,7 @@ function renderRealmMap() {
   html += '</div>'; // end map inner
 
   // ── TOOLTIP ──
-  html += '<div id="rtt" class="realm-tooltip" style="position:fixed;pointer-events:none">'
+  html += '<div id="rtt" class="realm-tooltip" style="position:fixed;pointer-events:none;z-index:9999">'
     + '<div style="font-family:Cinzel,serif;font-size:12px;font-weight:700;color:var(--gold)" id="rttName"></div>'
     + '<div style="font-size:11px;color:var(--dim);line-height:1.6" id="rttRec"></div>'
     + '</div>';
@@ -2078,14 +2078,23 @@ function renderRealmMap() {
           ? '<br><span style="color:var(--gold)">S1: '+s1r.w+'-'+s1r.l+' · '+s1r.pts.toFixed(1)+' PF</span>'
             +(s1r.result==='champion'?' 🏆':'')+(s1r.result==='runner-up'?' 🥈':'')+(s1r.result==='third'?' 🥉':'')
           : '<br><span style="color:var(--amber);font-size:10px">S1: New team</span>';
-        document.getElementById('rttName').textContent = tn2;
-        document.getElementById('rttRec').innerHTML = 'S2: '+w+'-'+l+' · '+pts+' pts'+s1Line+'<br><span style="font-size:10px;color:var(--dim)">'+(u.display_name||'')+'</span>';
+        var nameEl = document.getElementById('rttName');
+        var recEl  = document.getElementById('rttRec');
+        if (!nameEl || !recEl) return;
+        nameEl.textContent = tn2;
+        recEl.innerHTML = 'S2: '+w+'-'+l+' · '+pts+' pts'+s1Line+'<br><span style="font-size:10px;color:var(--dim)">'+(u.display_name||'')+'</span>';
         var nr = node.getBoundingClientRect();
-        tip.style.left = (nr.left + nr.width/2 - 80) + 'px';
-        tip.style.top  = (nr.top - 100) + 'px';
+        var tipLeft = nr.left + nr.width/2 - 90;
+        var tipTop  = nr.top - 110;
+        // Keep on screen
+        tipLeft = Math.max(8, Math.min(tipLeft, window.innerWidth - 188));
+        tipTop  = tipTop < 8 ? nr.bottom + 8 : tipTop;
+        tip.style.left = tipLeft + 'px';
+        tip.style.top  = tipTop  + 'px';
+        tip.style.display = 'block';
         tip.classList.add('show');
       }
-      function hide() { tip.classList.remove('show'); }
+      function hide() { tip.classList.remove('show'); tip.style.display='none'; }
       node.addEventListener('mouseenter', show);
       node.addEventListener('mouseleave', hide);
       node.addEventListener('touchstart', function(e){
