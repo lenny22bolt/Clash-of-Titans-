@@ -735,12 +735,62 @@ function viewRoster(rosterId, switchTab) {
       + '</div>';
   }
 
-  var html = '<div style="padding:13px 16px;border-bottom:1px solid rgba(201,168,76,.12);display:flex;align-items:center;gap:12px">'
-    + '<div style="width:42px;height:42px;border-radius:50%;border:2px solid var(--gold-border);background:var(--navy-mid);display:flex;align-items:center;justify-content:center;font-size:22px;overflow:hidden;flex-shrink:0">'
-    + (avSrc ? '<img src="'+avSrc+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.parentElement.innerHTML=\''+em+'\'">' : em)
+  // ── TITAN PROFILE (top of roster) ────────────────────────────
+  var _BIOS  = (typeof MANAGER_BIOS  !== 'undefined') ? MANAGER_BIOS  : {};
+  var _S1S   = (typeof S1_STATS      !== 'undefined') ? S1_STATS      : {};
+  var _PICKS = (typeof PICK_COUNTS   !== 'undefined') ? PICK_COUNTS   : {};
+  var _bio   = _BIOS[tn]  || {};
+  var _s1    = _S1S[tn]   || {w:0,l:0,pts:0,result:'new',pf_rank:0};
+  var _picks = _PICKS[tn] || 0;
+  var _mgr   = MANAGERS.find(function(x){ return x.name===tn; }) || {};
+  var _titan = (typeof getTitanHistory==='function') ? getTitanHistory().filter(function(t){ return t.name===tn; }) : [];
+  var _rc    = _s1.result==='champion'?'var(--gold)':_s1.result==='runner-up'?'#CCC':_s1.result==='third'?'#CD7F32':_s1.result==='basement'?'var(--red)':_s1.result==='new'?'var(--blue)':'var(--dim)';
+  var _rl    = _s1.result==='champion'?'🏆 S1 Champion':_s1.result==='runner-up'?'🥈 S1 Runner-Up':_s1.result==='third'?'🥉 S1 Third':_s1.result==='basement'?'💀 S1 Basement':_s1.result==='new'?'🆕 S2 Debut':_s1.result==='playoff'?'🏅 Made Playoffs':'📊 Regular Season';
+
+  var html = '<div style="background:linear-gradient(135deg,rgba(201,168,76,.1),rgba(201,168,76,.03));border-bottom:2px solid var(--gold-border);padding:16px">'
+
+    // Team header row
+    + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">'
+    +   '<div style="width:44px;height:44px;border-radius:50%;border:2px solid var(--gold);background:var(--navy-mid);display:flex;align-items:center;justify-content:center;font-size:22px;overflow:hidden;flex-shrink:0">'
+    +   (avSrc ? '<img src="'+avSrc+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.remove()">' : em)
+    +   '</div>'
+    +   '<div style="flex:1">'
+    +     '<div style="font-family:Cinzel,serif;font-size:15px;font-weight:700;color:var(--gold)">'+tn+'</div>'
+    +     '<div style="font-size:11px;color:var(--dim);margin-top:2px">'+(u.display_name||'')+' · '+w+'-'+l+' · '+pts+' pts</div>'
+    +     (_bio.title ? '<div style="font-size:10px;color:var(--gold);font-family:Cinzel,serif;margin-top:2px;opacity:.8">'+_bio.title+'</div>' : '')
+    +   '</div>'
+    +   (_bio.accolade ? '<span style="font-family:Cinzel,serif;font-size:8px;font-weight:700;padding:3px 8px;border-radius:8px;background:rgba(201,168,76,.12);color:var(--gold);border:1px solid var(--gold-border);white-space:nowrap">'+_bio.accolade+'</span>' : '')
     + '</div>'
-    + '<div><div style="font-family:Cinzel,serif;font-size:14px;font-weight:700;color:var(--gold)">'+tn+'</div>'
-    + '<div style="font-size:12px;color:var(--dim)">'+(u.display_name||'')+' · '+w+'-'+l+' · '+pts+' pts</div></div></div>';
+
+    // S1 vs S2 stat cards
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
+    +   '<div style="background:rgba(0,0,0,.3);border-radius:8px;padding:9px 12px">'
+    +     '<div style="font-family:Cinzel,serif;font-size:7px;letter-spacing:2px;color:var(--dim);margin-bottom:4px">SEASON 1</div>'
+    +     (_s1.result==='new'
+          ? '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--blue)">New to the realm</div>'
+          : '<div style="font-family:Cinzel,serif;font-size:18px;font-weight:700;color:var(--gold);line-height:1">'+_s1.w+'-'+_s1.l+'</div>'
+          + '<div style="font-size:10px;color:var(--dim);margin-top:2px">'+_s1.pts.toFixed(1)+' PF · #'+_s1.pf_rank+' league</div>'
+          + '<div style="font-size:10px;color:'+_rc+';font-weight:700;margin-top:3px">'+_rl+'</div>')
+    +   '</div>'
+    +   '<div style="background:rgba(0,0,0,.3);border-radius:8px;padding:9px 12px">'
+    +     '<div style="font-family:Cinzel,serif;font-size:7px;letter-spacing:2px;color:var(--dim);margin-bottom:4px">SEASON 2</div>'
+    +     '<div style="font-family:Cinzel,serif;font-size:18px;font-weight:700;color:var(--gold);line-height:1">'+w+'-'+l+'</div>'
+    +     '<div style="font-size:10px;color:var(--dim);margin-top:2px">'+pts+' PF · In progress</div>'
+    +     '<div style="font-size:10px;color:var(--blue);font-weight:700;margin-top:3px">⚡ Active</div>'
+    +   '</div>'
+    + '</div>'
+
+    // Tagline
+    + (_bio.tagline ? '<div style="font-size:12px;color:var(--dim);font-style:italic;margin-bottom:10px;line-height:1.5">"'+_bio.tagline+'"</div>' : '')
+
+    // Badge row
+    + '<div style="display:flex;gap:5px;flex-wrap:wrap">'
+    +   '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(201,168,76,.1);color:var(--gold);border:1px solid var(--gold-border)">🎯 '+_picks+' picks (2026-28)</span>'
+    +   (_bio.shame ? '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,107,107,.1);color:var(--red);border:1px solid rgba(255,107,107,.2)">'+_bio.shame+'</span>' : '')
+    +   (!_mgr.paid ? '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,179,71,.1);color:var(--amber);border:1px solid rgba(255,179,71,.2)">⏳ Buy-in pending</span>' : '')
+    +   (_titan.length ? '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(201,168,76,.15);color:var(--gold);border:1px solid var(--gold-border)">👑 Titan ×'+_titan.length+'</span>' : '')
+    + '</div>'
+    + '</div>';
 
   if (starters.length) { html += '<div class="rdsec">Starters</div>'; starters.forEach(function(p,i){html+=prow(p,slots[i]||'FLEX');}); }
   if (bench.length)    { html += '<div class="rdsec">Bench</div>';    bench.forEach(function(p){html+=prow(p,'BN');}); }
@@ -877,51 +927,6 @@ function viewRoster(rosterId, switchTab) {
     html += ownedHTML;
   }
 
-  // ── PROFILE CARD (injected into roster tab) ──────────────────
-  var _BIOS  = (typeof MANAGER_BIOS  !== 'undefined') ? MANAGER_BIOS  : {};
-  var _S1S   = (typeof S1_STATS      !== 'undefined') ? S1_STATS      : {};
-  var _PICKS = (typeof PICK_COUNTS   !== 'undefined') ? PICK_COUNTS   : {};
-  var _bio   = _BIOS[tn] || {};
-  var _s1    = _S1S[tn]     || {w:0,l:0,pts:0,result:'new',pf_rank:0};
-  var _picks = _PICKS[tn] || 0  || 0;
-  var _mgr   = MANAGERS.find(function(x){ return x.name===tn; }) || {};
-  var _titan = (typeof getTitanHistory==='function') ? getTitanHistory().filter(function(t){ return t.name===tn; }) : [];
-  var _rc    = _s1.result==='champion'?'var(--gold)':_s1.result==='runner-up'?'#CCC':_s1.result==='third'?'#CD7F32':_s1.result==='basement'?'var(--red)':_s1.result==='new'?'var(--blue)':'var(--dim)';
-  var _rl    = _s1.result==='champion'?'🏆 S1 Champion':_s1.result==='runner-up'?'🥈 S1 Runner-Up':_s1.result==='third'?'🥉 S1 Third Place':_s1.result==='basement'?'💀 S1 Basement':_s1.result==='new'?'🆕 Season 2 Debut':_s1.result==='playoff'?'🏅 Made Playoffs':'📊 Regular Season';
-
-  html += '<div class="rdsec">Manager Profile</div>'
-    + '<div style="background:linear-gradient(135deg,rgba(201,168,76,.06),transparent);padding:14px 16px 16px">'
-    + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">'
-    +   '<span style="font-size:28px">'+(_mgr.emoji||'👤')+'</span>'
-    +   '<div style="flex:1">'
-    +     '<div style="font-family:Cinzel,serif;font-size:12px;font-weight:700;color:var(--gold)">'+(_bio.title||tn)+'</div>'
-    +     '<div style="font-size:11px;color:var(--dim);font-style:italic;margin-top:2px">'+(_bio.tagline||'')+'</div>'
-    +   '</div>'
-    +   (_bio.accolade ? '<span style="font-family:Cinzel,serif;font-size:8px;font-weight:700;padding:3px 8px;border-radius:8px;background:rgba(201,168,76,.1);color:var(--gold);border:1px solid var(--gold-border);white-space:nowrap">'+_bio.accolade+'</span>' : '')
-    + '</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
-    +   '<div style="background:rgba(0,0,0,.25);border-radius:8px;padding:9px 12px">'
-    +     '<div style="font-family:Cinzel,serif;font-size:8px;letter-spacing:2px;color:var(--dim);margin-bottom:4px">SEASON 1</div>'
-    +     (_s1.result==='new'
-          ? '<div style="font-family:Cinzel,serif;font-size:12px;color:var(--blue)">New to the realm</div>'
-          : '<div style="font-family:Cinzel,serif;font-size:17px;font-weight:700;color:var(--gold)">'+_s1.w+'-'+_s1.l+'</div>'
-          + '<div style="font-size:10px;color:var(--dim)">'+_s1.pts.toFixed(1)+' PF · League #'+_s1.pf_rank+'</div>'
-          + '<div style="font-size:10px;color:'+_rc+';font-weight:700;margin-top:3px">'+_rl+'</div>')
-    +   '</div>'
-    +   '<div style="background:rgba(0,0,0,.25);border-radius:8px;padding:9px 12px">'
-    +     '<div style="font-family:Cinzel,serif;font-size:8px;letter-spacing:2px;color:var(--dim);margin-bottom:4px">SEASON 2</div>'
-    +     '<div style="font-family:Cinzel,serif;font-size:17px;font-weight:700;color:var(--gold)">'+w+'-'+l+'</div>'
-    +     '<div style="font-size:10px;color:var(--dim)">'+pts+' PF · In progress</div>'
-    +     '<div style="font-size:10px;color:var(--blue);font-weight:700;margin-top:3px">⚡ Active</div>'
-    +   '</div>'
-    + '</div>'
-    + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
-    +   '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(201,168,76,.1);color:var(--gold);border:1px solid var(--gold-border)">🎯 '+_picks+' picks (2026-28)</span>'
-    +   (_bio.shame ? '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,107,107,.1);color:var(--red);border:1px solid rgba(255,107,107,.2)">'+_bio.shame+'</span>' : '')
-    +   (!_mgr.paid ? '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,179,71,.1);color:var(--amber);border:1px solid rgba(255,179,71,.2)">⏳ Buy-in pending</span>' : '')
-    +   (_titan.length ? '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(201,168,76,.15);color:var(--gold);border:1px solid var(--gold-border)">👑 Titan ×'+_titan.length+'</span>' : '')
-    + '</div>'
-    + '</div>';
 
   document.getElementById('rdisplay').innerHTML = html;
 }
