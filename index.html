@@ -1882,26 +1882,35 @@ function renderRealmMap() {
   // Map layout: North=top-left, East=top-right, West=bottom-left, South=bottom-right
   // Arena of Olympus = center
   var TEAM_NODES = [
-    // ⚔ Runic North (top-left) — ice blue
-    {tn:"IceMonkey",            x:22, y:18, color:"#7BB8E8", champ:true},
-    {tn:"Fenrir's Fury",        x:34, y:13, color:"#7BB8E8"},
-    {tn:"Warrior Shohei Goatani",x:20,y:28, color:"#7BB8E8"},
-    {tn:"Orion Leaf",           x:34, y:25, color:"#7BB8E8"},
-    // 🌿 Ethereal East (top-right) — green
-    {tn:"Lord of Dreams",       x:72, y:18, color:"#6EDE7E", champ:true},
-    {tn:"Notchotaur",           x:82, y:14, color:"#6EDE7E"},
-    {tn:"Lord Jefita Clapper",  x:74, y:28, color:"#6EDE7E"},
-    {tn:"Talon",                x:84, y:26, color:"#6EDE7E"},
-    // 🌋 Primordial West (bottom-left) — red/orange
-    {tn:"ChatG-TDs",            x:18, y:68, color:"#FF6B6B", champ:true},
-    {tn:"Dewie Slayer of Bakunawa",x:10,y:76,color:"#FF6B6B"},
-    {tn:"Son of Rander",        x:22, y:78, color:"#FF6B6B"},
-    {tn:"Heir of Zeus",         x:12, y:86, color:"#FF6B6B"},
-    // ☀ Celestial South (bottom-right) — gold/amber
-    {tn:"Hermes Hail Marys",    x:72, y:68, color:"#FFB347", champ:true},
-    {tn:"Wrath of Moctezuma",   x:82, y:72, color:"#FFB347"},
-    {tn:"Beercules the Destroyer",x:70,y:79,color:"#FFB347"},
-    {tn:"Stefanos the Spartan King",x:82,y:83,color:"#FFB347"}
+    // ⚔ Runic North (top-left) — on the icy mountain terrain, below the aurora sky
+    // Avoid: "RUNIC NORTH" label ~x:18,y:32 and shield ~x:12,y:28
+    {tn:"IceMonkey",             x:30, y:20, color:"#7BB8E8"},  // on mountain peak
+    {tn:"Fenrir's Fury",         x:18, y:38, color:"#7BB8E8"},  // lower, on runic coast terrain (not sky)
+    {tn:"Warrior Shohei Goatani",x:38, y:30, color:"#7BB8E8"},  // mid mountain right side
+    {tn:"Orion Leaf",            x:26, y:32, color:"#7BB8E8"},  // between mountains
+
+    // 🌿 Ethereal East (top-right) — on forest terrain
+    // Avoid: "ETHEREAL EAST" label ~x:78,y:28 and shield ~x:84,y:20
+    {tn:"Lord of Dreams",        x:68, y:22, color:"#6EDE7E"},  // forest edge top
+    {tn:"Notchotaur",            x:78, y:36, color:"#6EDE7E"},  // deeper forest right
+    {tn:"Lord Jefita Clapper",   x:66, y:34, color:"#6EDE7E"},  // forest floor left
+    {tn:"Talon",                 x:88, y:30, color:"#6EDE7E"},  // far forest right
+
+    // 🌋 Primordial West (bottom-left) — volcanic terrain
+    // Avoid: "PRIMORDIAL WEST" label ~x:16,y:74 and shield ~x:10,y:68
+    // ChatG-TDs moved away from symbol, above lava flow
+    {tn:"ChatG-TDs",             x:28, y:64, color:"#FF6B6B"},  // upper lava field, clear of symbol
+    {tn:"Dewie Slayer of Bakunawa",x:8, y:80, color:"#FF6B6B"}, // far left volcanic coast
+    {tn:"Son of Rander",         x:22, y:82, color:"#FF6B6B"},  // mid lava plain
+    {tn:"Heir of Zeus",          x:14, y:88, color:"#FF6B6B"},  // deep south-west corner
+
+    // ☀ Celestial South (bottom-right) — coastal/palm terrain
+    // Avoid: "CELESTIAL SOUTH" label ~x:78,y:74 and sun symbol ~x:82,y:66
+    // Hermes moved above label, Moctezuma moved below label
+    {tn:"Hermes Hail Marys",     x:62, y:66, color:"#FFB347"},  // left of sun symbol, coastal
+    {tn:"Wrath of Moctezuma",    x:76, y:82, color:"#FFB347"},  // below label, palm shore
+    {tn:"Beercules the Destroyer",x:66,y:78, color:"#FFB347"},  // mid-south coastal
+    {tn:"Stefanos the Spartan King",x:86,y:76,color:"#FFB347"}  // far right coast
   ];
 
   var html = '<div style="position:relative;border-radius:16px;overflow:hidden;border:2px solid var(--gold-border);background:#050D15">';
@@ -2071,9 +2080,24 @@ function renderRealmMap() {
       function hide() { tip.classList.remove('show'); }
       node.addEventListener('mouseenter', show);
       node.addEventListener('mouseleave', hide);
-      node.addEventListener('touchstart', function(e){ e.preventDefault(); show(); }, {passive:false});
-      document.addEventListener('touchstart', function(e){ if(!node.contains(e.target)) hide(); }, {passive:true});
+      node.addEventListener('touchstart', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        // Toggle: tap same node to hide
+        if (tip.classList.contains('show') && document.getElementById('rttName').textContent === node.dataset.tn) {
+          hide();
+        } else {
+          show();
+        }
+      }, {passive:false});
     });
+    // Dismiss tooltip when tapping outside any node (iOS)
+    var mapEl = document.getElementById('mapInner');
+    if (mapEl) {
+      mapEl.addEventListener('touchstart', function(e) {
+        if (!e.target.closest('.map-node')) hide();
+      }, {passive:true});
+    }
   }, 200);
 }
 
