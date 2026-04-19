@@ -247,7 +247,7 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
   <button class="nb"     onclick="showTab('history',this)">S1 History</button>
   <button class="nb"     onclick="showTab('draft2026',this)">2026 Draft</button>
   <button class="nb"     onclick="showTab('treasury',this)">🏛 Treasury</button>
-  <button class="nb"     onclick="showTab('fallen',this)">⚔ Fallen</button>
+  <button class="nb"     onclick="showTab('fallen',this)">Fallen</button>
   <button class="nb"     onclick="showTab('quests',this)">🗡 Quests</button>
   <button class="nb"     onclick="showTab('power',this)">👑 Power Rankings</button>
   <button class="nb"     onclick="showTab('realmmap',this)">🗺 Realm Map</button>
@@ -264,7 +264,7 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
   <div class="sec" id="sec-history"><div class="stitle">Season 1 — Final Records</div><div id="hwrap"></div></div>
   <div class="sec" id="sec-draft2026"><div class="stitle">2026 Rookie Draft Order</div><div id="draft2026wrap"></div></div>
   <div class="sec" id="sec-treasury"><div class="stitle">🏛 Titan Treasury</div><div id="treasurywrap"></div></div>
-  <div class="sec" id="sec-fallen"><div class="stitle">⚔ Fallen Warriors</div><div id="fallenwrap"></div></div>
+  <div class="sec" id="sec-fallen"><div class="stitle">Fallen Warriors</div><div id="fallenwrap"></div></div>
   <div class="sec" id="sec-power">
     <div class="stitle">👑 Dynasty Power Rankings</div>
     <div id="powerwrap"></div>
@@ -1924,7 +1924,7 @@ function renderRealmMap() {
   var html = '<div style="position:relative;border-radius:16px;overflow:hidden;border:2px solid var(--gold-border);background:#050D15">';
 
   // ── MAIN MAP IMAGE as background ──
-  html += '<div style="position:relative;width:100%;padding-bottom:75%;overflow:hidden" id="mapInner">';
+  html += '<div style="position:relative;width:100%;padding-bottom:95%;overflow:hidden" id="mapInner">';
   html += '<img src="'+BASE_IMG+'map-hex.png" id="mapBg" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;display:block" onerror="this.remove()">';
   // Overlay on top of image, covers same area
   html += '<div style="position:absolute;inset:0;background:rgba(5,13,21,0.06);pointer-events:none"></div>';
@@ -1989,8 +1989,7 @@ function renderRealmMap() {
 
   // ── ARENA OF OLYMPUS center label ──
   html += '<div style="position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);text-align:center;z-index:4;pointer-events:none">'
-    + '<div style="font-size:22px;filter:drop-shadow(0 0 12px #FFD700)">⚔</div>'
-    + '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--gold);letter-spacing:2px;text-shadow:0 1px 6px #000;font-weight:700">ARENA OF OLYMPUS</div>'
+    + '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--gold);letter-spacing:2px;text-shadow:0 1px 6px #000,0 0 12px rgba(255,215,0,0.8);font-weight:700;background:rgba(5,13,21,0.5);padding:3px 8px;border-radius:4px">ARENA OF OLYMPUS</div>'
     + '</div>';
 
   html += '</div>'; // end map inner
@@ -2016,7 +2015,7 @@ function renderRealmMap() {
   // ── DIVISION BIO SECTION ──
   var BASE_IMG2 = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
   html += '<div style="margin-top:1.5rem">';
-  html += '<div class="stitle">⚔ Division Lore</div>';
+  html += '<div class="stitle">Division Lore</div>';
 
   // Division crest buttons row
   html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.2rem">';
