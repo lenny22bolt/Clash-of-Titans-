@@ -1821,236 +1821,148 @@ function suggestQuest(){
 // ── REALM MAP ─────────────────────────────────────────────────
 function renderRealmMap() {
   var wrap = document.getElementById('realmwrap');
+  var BASE_IMG = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
 
-  var S1_DIV_WINNERS = {
-    1:{team:"IceMonkey",color:"#7BB8E8"},2:{team:"Hermes Hail Marys",color:"#FFB347"},
-    3:{team:"Lord of Dreams",color:"#6EDE7E"},4:{team:"ChatG-TDs",color:"#FF6B6B"}
-  };
-  var TEAM_COLORS = {
-    "IceMonkey":"#7BB8E8","Fenrir's Fury":"#5599CC","Warrior Shohei Goatani":"#4488BB","Orion Leaf":"#336699",
-    "Hermes Hail Marys":"#FFB347","Wrath of Moctezuma":"#FF8C00","Beercules the Destroyer":"#E07020","Stefanos the Spartan King":"#CC6600",
-    "Lord of Dreams":"#6EDE7E","Notchotaur":"#50C060","Lord Jefita Clapper":"#389945","Talon":"#207030",
-    "ChatG-TDs":"#FF6B6B","Dewie Slayer of Bakunawa":"#E04444","Son of Rander":"#CC3333","Heir of Zeus":"#AA2222"
-  };
-  var DIVS = {
-    1:{name:"Runic North",    cx:410,cy:140,rx:200,ry:130,color:"#7BB8E8"},
-    2:{name:"Celestial South",cx:410,cy:775,rx:200,ry:130,color:"#FFB347"},
-    3:{name:"Ethereal East",  cx:672,cy:450,rx:130,ry:190,color:"#6EDE7E"},
-    4:{name:"Primordial West",cx:148,cy:450,rx:130,ry:190,color:"#FF6B6B"}
-  };
+  // Team positions on the real map image (percentages of 820x1100 viewport)
+  // Map layout: North=top-left, East=top-right, West=bottom-left, South=bottom-right
+  // Arena of Olympus = center
+  var TEAM_NODES = [
+    // ⚔ Runic North (top-left) — ice blue
+    {tn:"IceMonkey",            x:22, y:18, color:"#7BB8E8", champ:true},
+    {tn:"Fenrir's Fury",        x:34, y:13, color:"#7BB8E8"},
+    {tn:"Warrior Shohei Goatani",x:20,y:28, color:"#7BB8E8"},
+    {tn:"Orion Leaf",           x:34, y:25, color:"#7BB8E8"},
+    // 🌿 Ethereal East (top-right) — green
+    {tn:"Lord of Dreams",       x:72, y:18, color:"#6EDE7E", champ:true},
+    {tn:"Notchotaur",           x:82, y:14, color:"#6EDE7E"},
+    {tn:"Lord Jefita Clapper",  x:74, y:28, color:"#6EDE7E"},
+    {tn:"Talon",                x:84, y:26, color:"#6EDE7E"},
+    // 🌋 Primordial West (bottom-left) — red/orange
+    {tn:"ChatG-TDs",            x:18, y:68, color:"#FF6B6B", champ:true},
+    {tn:"Dewie Slayer of Bakunawa",x:10,y:76,color:"#FF6B6B"},
+    {tn:"Son of Rander",        x:22, y:78, color:"#FF6B6B"},
+    {tn:"Heir of Zeus",         x:12, y:86, color:"#FF6B6B"},
+    // ☀ Celestial South (bottom-right) — gold/amber
+    {tn:"Hermes Hail Marys",    x:72, y:68, color:"#FFB347", champ:true},
+    {tn:"Wrath of Moctezuma",   x:82, y:72, color:"#FFB347"},
+    {tn:"Beercules the Destroyer",x:70,y:79,color:"#FFB347"},
+    {tn:"Stefanos the Spartan King",x:82,y:83,color:"#FFB347"}
+  ];
 
-  // Hardcoded division assignments (Sleeper div IDs may vary)
-  var TEAM_DIVS = {
-    "IceMonkey":1,"Fenrir's Fury":1,"Warrior Shohei Goatani":1,"Orion Leaf":1,
-    "Hermes Hail Marys":2,"Wrath of Moctezuma":2,"Beercules the Destroyer":2,"Stefanos the Spartan King":2,
-    "Lord of Dreams":3,"Notchotaur":3,"Lord Jefita Clapper":3,"Talon":3,
-    "ChatG-TDs":4,"Dewie Slayer of Bakunawa":4,"Son of Rander":4,"Heir of Zeus":4
-  };
+  var html = '<div style="position:relative;border-radius:16px;overflow:hidden;border:2px solid var(--gold-border);background:#050D15">';
 
-  var winMap = {};
-  S.rosters.forEach(function(r){
-    var u=getUser(r.owner_id), tn=resolveTeamName(r,u);
-    winMap[tn]=(r.settings&&r.settings.wins)||0;
+  // ── MAIN MAP IMAGE as background ──
+  html += '<div style="position:relative;width:100%;padding-bottom:133%" id="mapInner">';
+  html += '<img src="'+BASE_IMG+'map.png" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.opacity=0.1">';
+
+  // Dark overlay for readability
+  html += '<div style="position:absolute;inset:0;background:rgba(5,13,21,0.35);pointer-events:none"></div>';
+
+  // ── DIVISION CRESTS (corners) ──
+  var crests = [
+    {img:'crest-north.png', label:'⚔ Runic North',    color:'#7BB8E8', pos:'top:2%;left:2%',    size:60},
+    {img:'crest-east.png',  label:'🌿 Ethereal East',  color:'#6EDE7E', pos:'top:2%;right:2%',   size:60},
+    {img:'crest-west.png',  label:'🌋 Primordial West',color:'#FF6B6B', pos:'bottom:8%;left:2%', size:60},
+    {img:'crest-south.png', label:'☀ Celestial South', color:'#FFB347', pos:'bottom:8%;right:2%',size:60}
+  ];
+  crests.forEach(function(c) {
+    html += '<div style="position:absolute;'+c.pos+';text-align:center;z-index:3">'
+      + '<img src="'+BASE_IMG+c.img+'" style="width:'+c.size+'px;height:'+c.size+'px;object-fit:contain;border-radius:8px;filter:drop-shadow(0 2px 8px rgba(0,0,0,.8))" onerror="this.remove()">'
+      + '</div>';
   });
 
-  var divTotalWins={1:0,2:0,3:0,4:0};
-  var divTeams={1:[],2:[],3:[],4:[]};
+  // ── TEAM NODES ──
+  TEAM_NODES.forEach(function(node) {
+    var s1 = getS1ByTeamName(node.tn);
+    var badges = '';
+    if (node.champ) badges += '<span style="font-size:8px">👑</span>';
+    if (s1 && s1.result === 'champion') badges += '<span style="font-size:8px">🏆</span>';
+    if (s1 && s1.result === 'runner-up') badges += '<span style="font-size:8px">🥈</span>';
+    if (s1 && s1.result === 'third') badges += '<span style="font-size:8px">🥉</span>';
 
-  // Build divTeams from hardcoded map — guaranteed all 4 divisions populated
-  Object.keys(TEAM_DIVS).forEach(function(tn){
-    var d = TEAM_DIVS[tn];
-    var w = winMap[tn]||0;
-    divTotalWins[d]+=w;
-    divTeams[d].push({name:tn, wins:w, color:TEAM_COLORS[tn]||'#888888'});
+    // Short name for label
+    var shortName = node.tn.split(' ')[0];
+    if (node.tn === "Warrior Shohei Goatani") shortName = "Shohei";
+    if (node.tn === "Dewie Slayer of Bakunawa") shortName = "Dewie";
+    if (node.tn === "Lord Jefita Clapper") shortName = "Jefita";
+    if (node.tn === "Beercules the Destroyer") shortName = "Beercules";
+    if (node.tn === "Stefanos the Spartan King") shortName = "Stefanos";
+    if (node.tn === "Wrath of Moctezuma") shortName = "Moctezuma";
+    if (node.tn === "Hermes Hail Marys") shortName = "Hermes";
+    if (node.tn === "Fenrir's Fury") shortName = "Fenrir";
+    if (node.tn === "Lord of Dreams") shortName = "LoDreams";
+    if (node.tn === "Son of Rander") shortName = "Rander";
+    if (node.tn === "Heir of Zeus") shortName = "Heir";
+
+    html += '<div class="map-node" data-tn="'+node.tn+'" '
+      + 'style="position:absolute;left:'+node.x+'%;top:'+node.y+'%;transform:translate(-50%,-50%);z-index:5;cursor:pointer;text-align:center">'
+      // Glow circle
+      + '<div style="width:28px;height:28px;border-radius:50%;background:'+node.color+';opacity:.2;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);filter:blur(4px)"></div>'
+      // Main dot
+      + '<div style="width:14px;height:14px;border-radius:50%;background:'+node.color+';border:2px solid rgba(255,255,255,.6);box-shadow:0 0 8px '+node.color+';margin:0 auto 2px"></div>'
+      // Label
+      + '<div style="font-family:Cinzel,serif;font-size:7px;font-weight:700;color:#FFF;text-shadow:0 1px 4px #000,0 0 8px #000;white-space:nowrap;line-height:1.2">'+shortName+'</div>'
+      + (badges ? '<div style="line-height:1">'+badges+'</div>' : '')
+      + '</div>';
   });
 
-  var seasonStarted=Object.keys(winMap).some(function(k){return winMap[k]>0;});
+  // ── ARENA OF OLYMPUS center label ──
+  html += '<div style="position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);text-align:center;z-index:4;pointer-events:none">'
+    + '<div style="font-size:22px;filter:drop-shadow(0 0 12px #FFD700)">⚔</div>'
+    + '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--gold);letter-spacing:2px;text-shadow:0 1px 6px #000;font-weight:700">ARENA OF OLYMPUS</div>'
+    + '</div>';
 
-  function buildTerritoryBlobs(divNum){
-    var div=DIVS[divNum], teams=divTeams[divNum]||[], total=divTotalWins[divNum];
-    var winner=S1_DIV_WINNERS[divNum], out='';
-    teams.forEach(function(t){
-      var isWinner=(t.name===winner.team);
-      var angle=teams.indexOf(t)*(360/teams.length);
-      var spread, offX, offY, rx2, ry2, opacity;
-      if(!seasonStarted){
-        spread=isWinner?0.85:0.12;
-        offX=isWinner?0:Math.cos(angle*Math.PI/180)*div.rx*0.5;
-        offY=isWinner?0:Math.sin(angle*Math.PI/180)*div.ry*0.5;
-        rx2=div.rx*spread*(isWinner?1:0.25);
-        ry2=div.ry*spread*(isWinner?1:0.25);
-        opacity=isWinner?0.25:0.15;
-      } else {
-        var floor=0.12;
-        var share=total>0?(t.wins/total)*(1-floor*teams.length)+floor:floor;
-        share=Math.max(floor,Math.min(0.85,share));
-        var leader=teams.reduce(function(a,b){return b.wins>a.wins?b:a;},teams[0]);
-        var isLeader=(t.name===leader.name);
-        offX=isLeader?0:Math.cos(angle*Math.PI/180)*div.rx*(1-share)*0.6;
-        offY=isLeader?0:Math.sin(angle*Math.PI/180)*div.ry*(1-share)*0.6;
-        rx2=div.rx*share*0.9; ry2=div.ry*share*0.9;
-        opacity=0.15+share*0.3;
+  html += '</div>'; // end map inner
+
+  // ── TOOLTIP ──
+  html += '<div id="rtt" class="realm-tooltip" style="position:fixed;pointer-events:none">'
+    + '<div style="font-family:Cinzel,serif;font-size:12px;font-weight:700;color:var(--gold)" id="rttName"></div>'
+    + '<div style="font-size:11px;color:var(--dim);line-height:1.6" id="rttRec"></div>'
+    + '</div>';
+
+  // ── LEGEND ──
+  html += '<div style="display:flex;gap:1rem;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--gold-border);align-items:center;background:rgba(0,0,0,.3)">'
+    + '<span style="font-family:Cinzel,serif;font-size:10px;color:#7BB8E8">⚔ Runic North</span>'
+    + '<span style="font-family:Cinzel,serif;font-size:10px;color:#FFB347">☀ Celestial South</span>'
+    + '<span style="font-family:Cinzel,serif;font-size:10px;color:#6EDE7E">🌿 Ethereal East</span>'
+    + '<span style="font-family:Cinzel,serif;font-size:10px;color:#FF6B6B">🌋 Primordial West</span>'
+    + '<span style="font-family:Cinzel,serif;font-size:10px;color:var(--gold);margin-left:auto">Tap nodes for stats</span>'
+    + '</div>';
+
+  html += '</div>'; // end outer
+  wrap.innerHTML = html;
+
+  // ── TOOLTIP EVENTS ──
+  setTimeout(function() {
+    var nodes = document.querySelectorAll('.map-node');
+    var tip = document.getElementById('rtt');
+    nodes.forEach(function(node) {
+      function show() {
+        var tn2 = node.dataset.tn;
+        var r = S.rosters.find(function(ro){ var u=getUser(ro.owner_id); return resolveTeamName(ro,u)===tn2; });
+        var u = r ? getUser(r.owner_id) : {};
+        var w = r&&r.settings ? r.settings.wins||0 : 0;
+        var l = r&&r.settings ? r.settings.losses||0 : 0;
+        var pts = r&&r.settings ? (((r.settings.fpts||0)+(r.settings.fpts_decimal||0)/100).toFixed(1)) : '0.0';
+        var s1r = getS1ByTeamName(tn2)||getS1(u);
+        var s1Line = s1r
+          ? '<br><span style="color:var(--gold)">S1: '+s1r.w+'-'+s1r.l+' · '+s1r.pts.toFixed(1)+' PF</span>'
+            +(s1r.result==='champion'?' 🏆':'')+(s1r.result==='runner-up'?' 🥈':'')+(s1r.result==='third'?' 🥉':'')
+          : '<br><span style="color:var(--amber);font-size:10px">S1: New team</span>';
+        document.getElementById('rttName').textContent = tn2;
+        document.getElementById('rttRec').innerHTML = 'S2: '+w+'-'+l+' · '+pts+' pts'+s1Line+'<br><span style="font-size:10px;color:var(--dim)">'+(u.display_name||'')+'</span>';
+        var nr = node.getBoundingClientRect();
+        tip.style.left = (nr.left + nr.width/2 - 80) + 'px';
+        tip.style.top  = (nr.top - 100) + 'px';
+        tip.classList.add('show');
       }
-      out+='<ellipse cx="'+(div.cx+offX)+'" cy="'+(div.cy+offY)+'" rx="'+rx2+'" ry="'+ry2+'" fill="'+t.color+'" fill-opacity="'+opacity+'" stroke="'+t.color+'" stroke-width="'+(isWinner?1.5:0.8)+'" stroke-opacity="'+(isWinner?0.5:0.3)+'"/>';
+      function hide() { tip.classList.remove('show'); }
+      node.addEventListener('mouseenter', show);
+      node.addEventListener('mouseleave', hide);
+      node.addEventListener('touchstart', function(e){ e.preventDefault(); show(); }, {passive:false});
+      document.addEventListener('touchstart', function(e){ if(!node.contains(e.target)) hide(); }, {passive:true});
     });
-    return out;
-  }
-
-  function buildNodes(teams){
-    var out='';
-    var S1_RANKS={'IceMonkey':1,'ChatG-TDs':2,'Lord of Dreams':3};
-    var DIV_CHAMPS=['IceMonkey','Hermes Hail Marys','Lord of Dreams','ChatG-TDs'];
-    teams.forEach(function(t){
-      var w=winMap[t.tn]||0, rank=S1_RANKS[t.tn]||null, isDivChamp=DIV_CHAMPS.indexOf(t.tn)!==-1;
-      var size=18+Math.min(w*1.5,8);
-      if(rank===1){
-        out+='<circle cx="'+t.cx+'" cy="'+t.cy+'" r="'+(size+14)+'" fill="none" stroke="rgba(180,240,255,0.15)" stroke-width="3"/>';
-        out+='<circle cx="'+t.cx+'" cy="'+t.cy+'" r="'+(size+10)+'" fill="none" stroke="#B8F0FF" stroke-width="2.5" stroke-dasharray="4,3" opacity="0.9"/>';
-        out+='<circle cx="'+t.cx+'" cy="'+t.cy+'" r="'+(size+6)+'" fill="none" stroke="#E8F8FF" stroke-width="1.5" opacity="0.6"/>';
-        var sp=size+11;
-        [0,90,180,270].forEach(function(a){
-          out+='<circle cx="'+(t.cx+sp*Math.cos(a*Math.PI/180)).toFixed(1)+'" cy="'+(t.cy+sp*Math.sin(a*Math.PI/180)).toFixed(1)+'" r="2.5" fill="#B8F0FF" opacity="0.9"/>';
-        });
-      } else if(rank===2){
-        out+='<circle cx="'+t.cx+'" cy="'+t.cy+'" r="'+(size+12)+'" fill="none" stroke="rgba(192,192,192,0.2)" stroke-width="3"/>';
-        out+='<circle cx="'+t.cx+'" cy="'+t.cy+'" r="'+(size+8)+'" fill="none" stroke="#C8C8C8" stroke-width="2" stroke-dasharray="5,4" opacity="0.85"/>';
-      } else if(rank===3){
-        out+='<circle cx="'+t.cx+'" cy="'+t.cy+'" r="'+(size+12)+'" fill="none" stroke="rgba(180,100,30,0.2)" stroke-width="3"/>';
-        out+='<circle cx="'+t.cx+'" cy="'+t.cy+'" r="'+(size+8)+'" fill="none" stroke="#CD7F32" stroke-width="2" stroke-dasharray="5,4" opacity="0.85"/>';
-      }
-      if(isDivChamp){
-        out+='<circle cx="'+t.cx+'" cy="'+t.cy+'" r="'+(size+3)+'" fill="none" stroke="#C9A84C" stroke-width="1.8" stroke-dasharray="3,2" opacity="0.8"/>';
-        out+='<text x="'+t.cx+'" y="'+(t.cy-size-8)+'" text-anchor="middle" font-size="11">👑</text>';
-      }
-      var mainStroke=rank===1?'#B8F0FF':rank===2?'#C0C0C0':rank===3?'#CD7F32':isDivChamp?'#C9A84C':t.stroke;
-      out+='<circle cx="'+t.cx+'" cy="'+t.cy+'" r="'+size+'" fill="rgba(10,20,35,0.92)" stroke="'+mainStroke+'" stroke-width="'+(rank?'2.5':'1.5')+'" class="team-node" data-tn="'+t.tn+'" style="cursor:pointer"/>';
-      out+='<text x="'+t.cx+'" y="'+(t.cy+5)+'" text-anchor="middle" font-size="14" style="pointer-events:none">'+emo(t.tn)+'</text>';
-      out+='<text x="'+t.cx+'" y="'+(t.cy+size+13)+'" text-anchor="middle" font-family="Cinzel,serif" font-size="7" fill="rgba(224,213,192,0.65)" style="pointer-events:none">'+t.tn.split(' ')[0]+'</text>';
-      if(w>0){
-        out+='<circle cx="'+(t.cx+size-4)+'" cy="'+(t.cy-size+4)+'" r="8" fill="#C9A84C" stroke="var(--navy)" stroke-width="1.5"/>';
-        out+='<text x="'+(t.cx+size-4)+'" y="'+(t.cy-size+8)+'" text-anchor="middle" font-family="Cinzel,serif" font-size="8" font-weight="700" fill="#07111C">'+w+'</text>';
-      }
-      if(rank){
-        out+='<text x="'+(t.cx-size+2)+'" y="'+(t.cy-size+6)+'" text-anchor="middle" font-size="11">'+(rank===1?'🏆':rank===2?'🥈':'🥉')+'</text>';
-      }
-    });
-    return out;
-  }
-
-  var svg='<svg id="realmSVG" viewBox="0 0 820 900" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">'
-    +'<defs><radialGradient id="bg" cx="50%" cy="50%" r="70%"><stop offset="0%" stop-color="#0F2030"/><stop offset="100%" stop-color="#050D15"/></radialGradient></defs>'
-    +'<rect width="820" height="900" fill="url(#bg)"/>'
-    +'<g stroke="rgba(201,168,76,0.03)" stroke-width="1"><line x1="0" y1="225" x2="820" y2="225"/><line x1="0" y1="450" x2="820" y2="450"/><line x1="0" y1="675" x2="820" y2="675"/><line x1="205" y1="0" x2="205" y2="900"/><line x1="410" y1="0" x2="410" y2="900"/><line x1="615" y1="0" x2="615" y2="900"/></g>'
-    +buildTerritoryBlobs(1)+buildTerritoryBlobs(2)+buildTerritoryBlobs(3)+buildTerritoryBlobs(4)
-    +'<ellipse cx="410" cy="450" rx="370" ry="400" fill="none" stroke="rgba(201,168,76,0.1)" stroke-width="1.5" stroke-dasharray="8,6"/>'
-    +'<g stroke="rgba(201,168,76,0.1)" stroke-width="1.2" stroke-dasharray="5,5"><line x1="410" y1="130" x2="680" y2="450"/><line x1="410" y1="130" x2="140" y2="450"/><line x1="410" y1="770" x2="680" y2="450"/><line x1="410" y1="770" x2="140" y2="450"/><line x1="140" y1="450" x2="680" y2="450"/><line x1="410" y1="130" x2="410" y2="770"/></g>'
-    +'<circle cx="410" cy="450" r="55" fill="rgba(201,168,76,0.06)" stroke="rgba(201,168,76,0.3)" stroke-width="1.5"/>'
-    +'<circle cx="410" cy="450" r="38" fill="rgba(201,168,76,0.04)" stroke="rgba(201,168,76,0.15)" stroke-width="1"/>'
-    +'<text x="410" y="443" text-anchor="middle" font-size="22">⚔</text>'
-    +'<text x="410" y="465" text-anchor="middle" font-family="Cinzel,serif" font-size="8" fill="rgba(201,168,76,0.7)" letter-spacing="2">CLASH OF TITANS</text>'
-    +'<text x="410" y="32" text-anchor="middle" font-family="Cinzel,serif" font-size="13" fill="rgba(123,184,232,0.9)" letter-spacing="2" font-weight="700">⚔ RUNIC NORTH</text>'
-    +'<text x="410" y="888" text-anchor="middle" font-family="Cinzel,serif" font-size="13" fill="rgba(255,179,71,0.9)" letter-spacing="2" font-weight="700">☀ CELESTIAL SOUTH</text>'
-    +'<text x="800" y="454" text-anchor="middle" font-family="Cinzel,serif" font-size="13" fill="rgba(110,222,126,0.9)" letter-spacing="2" font-weight="700" transform="rotate(90,800,454)">🌿 ETHEREAL EAST</text>'
-    +'<text x="20" y="454" text-anchor="middle" font-family="Cinzel,serif" font-size="13" fill="rgba(255,107,107,0.9)" letter-spacing="2" font-weight="700" transform="rotate(-90,20,454)">🌋 PRIMORDIAL WEST</text>'
-    +buildBanner2(410,65,'#7BB8E8','IceMonkey')
-    +buildBanner2(410,825,'#FFB347','Hermes Hail Marys')
-    +buildBanner2(672,405,'#6EDE7E','Lord of Dreams')
-    +buildBanner2(148,405,'#FF6B6B','ChatG-TDs')
-    +buildNodes([{tn:"IceMonkey",cx:355,cy:110,stroke:"#7BB8E8",champ:true},{tn:"Fenrir's Fury",cx:455,cy:100,stroke:"#7BB8E8"},{tn:"Warrior Shohei Goatani",cx:365,cy:175,stroke:"#7BB8E8"},{tn:"Orion Leaf",cx:465,cy:165,stroke:"#7BB8E8"}])
-    +buildNodes([{tn:"Hermes Hail Marys",cx:355,cy:745,stroke:"#FFB347",champ:true},{tn:"Wrath of Moctezuma",cx:455,cy:755,stroke:"#FFB347"},{tn:"Beercules the Destroyer",cx:365,cy:815,stroke:"#FFB347"},{tn:"Stefanos the Spartan King",cx:465,cy:805,stroke:"#FFB347"}])
-    +buildNodes([{tn:"Lord of Dreams",cx:638,cy:350,stroke:"#6EDE7E",champ:true},{tn:"Notchotaur",cx:710,cy:390,stroke:"#6EDE7E"},{tn:"Lord Jefita Clapper",cx:635,cy:470,stroke:"#6EDE7E"},{tn:"Talon",cx:710,cy:515,stroke:"#6EDE7E"}])
-    +buildNodes([{tn:"ChatG-TDs",cx:182,cy:350,stroke:"#FF6B6B",champ:true},{tn:"Dewie Slayer of Bakunawa",cx:108,cy:390,stroke:"#FF6B6B"},{tn:"Son of Rander",cx:183,cy:470,stroke:"#FF6B6B"},{tn:"Heir of Zeus",cx:108,cy:515,stroke:"#FF6B6B"}])
-    +'<text x="410" y="895" text-anchor="middle" font-family="Cinzel,serif" font-size="8" fill="rgba(201,168,76,0.3)" letter-spacing="3">SEASON 2 · 2026</text>'
-    +'</svg>';
-
-  wrap.innerHTML=
-    '<div style="background:var(--navy-card);border:1px solid var(--gold-border);border-radius:10px;padding:10px 16px;margin-bottom:1rem;font-family:Cinzel,serif;font-size:11px;color:var(--dim);line-height:1.7">'
-    +'<strong style="color:var(--gold)">Living Territory Map</strong> · S1 division champions claim territory. Wins = land as season progresses. Hover nodes for stats.'
-    +'</div>'
-    +'<div class="realm-map-wrap" style="position:relative" id="mapInner">'+svg
-    +'<div class="realm-tooltip" id="rtt" style="position:absolute"><div style="font-family:Cinzel,serif;font-size:12px;font-weight:700;color:var(--gold)" id="rttName"></div><div style="font-size:11px;color:var(--dim);line-height:1.6" id="rttRec"></div></div>'
-    +'</div>'
-    +'<div style="display:flex;gap:1rem;flex-wrap:wrap;margin-top:1rem;padding:12px 16px;background:var(--navy-card);border-radius:10px;border:1px solid var(--gold-border);align-items:center">'
-    +'<span style="font-family:Cinzel,serif;font-size:10px;color:#7BB8E8">⚔ Runic North</span>'
-    +'<span style="font-family:Cinzel,serif;font-size:10px;color:#FFB347">☀ Celestial South</span>'
-    +'<span style="font-family:Cinzel,serif;font-size:10px;color:#6EDE7E">🌿 Ethereal East</span>'
-    +'<span style="font-family:Cinzel,serif;font-size:10px;color:#FF6B6B">🌋 Primordial West</span>'
-    +'<span style="font-family:Cinzel,serif;font-size:10px;color:var(--gold)">👑 Div Champ · 💎 S1 Overall Champ · 🥈 Runner-Up · 🥉 Third</span>'
-    +'<span style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-left:auto;font-style:italic">Hover nodes for S1+S2 records</span>'
-    +'</div>';
-
-  setTimeout(function(){
-    var nodes=document.querySelectorAll('.team-node');
-    var tip=document.getElementById('rtt');
-    var inner=document.getElementById('mapInner');
-    if(!tip||!inner) return;
-    function showTip(node) {
-      var tn2=node.dataset.tn;
-      // Find roster using hardcoded division map for reliability
-      var r=S.rosters.find(function(ro){
-        var u=getUser(ro.owner_id);
-        return resolveTeamName(ro,u)===tn2||tname(ro,u)===tn2;
-      });
-      var u=r?getUser(r.owner_id):{};
-      var w=r&&r.settings?r.settings.wins||0:0;
-      var l=r&&r.settings?r.settings.losses||0:0;
-      var pts=r&&r.settings?(((r.settings.fpts||0)+(r.settings.fpts_decimal||0)/100).toFixed(1)):'0.0';
-      var s1r=getS1ByTeamName(tn2)||getS1(u);
-      var divNum=TEAM_DIVS[tn2]||1;
-      var divTotal=divTotalWins[divNum]||0;
-      var share=divTotal>0?Math.round((w/divTotal)*100):0;
-      var s1Line=s1r
-        ?'<br><span style="color:var(--gold);font-weight:600">S1: '+s1r.w+'-'+s1r.l+' · '+s1r.pts.toFixed(1)+' PF</span>'
-         +(s1r.result==='champion'?' <span style="color:#B8F0FF">🏆 Champion</span>':'')
-         +(s1r.result==='runner-up'?' <span style="color:#C0C0C0">🥈 Runner-Up</span>':'')
-         +(s1r.result==='third'?' <span style="color:#CD7F32">🥉 Third</span>':'')
-        :'<br><span style="color:var(--amber);font-size:10px">S1: Inaugural Season</span>';
-      document.getElementById('rttName').textContent=tn2;
-      document.getElementById('rttRec').innerHTML=
-        '<span style="color:var(--dim);font-size:10px;font-family:Cinzel,serif;letter-spacing:1px">SEASON 2</span>'
-        +'<br>'+w+'-'+l+' · '+pts+' pts'
-        +(seasonStarted&&divTotal>0?' · ~'+share+'% territory':'')
-        +'<br><span style="color:var(--dim);font-size:10px;font-family:Cinzel,serif;letter-spacing:1px">SEASON 1</span>'
-        +s1Line
-        +'<br><span style="font-size:10px;color:var(--dim)">'+(u.display_name||'')+'</span>';
-      var ir=inner.getBoundingClientRect(),nr=node.getBoundingClientRect();
-      var tipX=nr.left-ir.left+28;
-      var tipY=nr.top-ir.top-20;
-      // Keep tooltip on screen
-      tipX=Math.min(tipX, ir.width-180);
-      tipX=Math.max(tipX, 0);
-      tip.style.left=tipX+'px';
-      tip.style.top=tipY+'px';
-      tip.classList.add('show');
-      node.setAttribute('stroke-width','3');
-    }
-
-    function hideTip(node) {
-      tip.classList.remove('show');
-      if(node) node.setAttribute('stroke-width','1.5');
-    }
-
-    nodes.forEach(function(node){
-      // Mouse events (desktop)
-      node.addEventListener('mouseenter', function(){ showTip(node); });
-      node.addEventListener('mouseleave', function(){ hideTip(node); });
-      // Touch events (iOS/Android)
-      node.addEventListener('touchstart', function(e){
-        e.preventDefault();
-        e.stopPropagation();
-        // Hide any existing tip first
-        hideTip(null);
-        showTip(node);
-      }, {passive:false});
-    });
-
-    // Tap anywhere else to dismiss tooltip on mobile
-    inner.addEventListener('touchstart', function(e){
-      if(!e.target.classList.contains('team-node')){
-        hideTip(null);
-      }
-    }, {passive:true});
-  },150);
+  }, 200);
 }
 
 function buildBanner2(cx,cy,color,teamName){
