@@ -289,11 +289,62 @@ var AVA  = 'https://sleepercdn.com/avatars/thumbs/';
 var PIMG = 'https://sleepercdn.com/content/nfl/players/thumb/';
 
 var DIVMAP = {
-  1:{name:'Runic North',icon:'⚔'},
-  2:{name:'Celestial South',icon:'☀'},
-  3:{name:'Ethereal East',icon:'🌿'},
-  4:{name:'Primordial West',icon:'🌋'}
+  1:{name:'Runic North',    icon:'⚔', color:'#7BB8E8', crest:'crest-north.png'},
+  2:{name:'Celestial South',icon:'☀', color:'#FFB347', crest:'crest-south.png'},
+  3:{name:'Ethereal East',  icon:'🌿',color:'#6EDE7E', crest:'crest-east.png'},
+  4:{name:'Primordial West',icon:'🌋',color:'#FF6B6B', crest:'crest-west.png'}
 };
+
+var DIV_BIOS = {
+  1: {
+    title: "The Frozen Wastes of the Runic North",
+    lore: "Born from ancient runes carved into glacial stone, the Runic North is a land of cold calculation and brutal efficiency. The mountains here do not offer shelter — they demand tribute. Warriors of the North do not beg for victories. They take them. The aurora overhead is not beauty — it is a warning. IceMonkey, the reigning S1 Champion, proved the North's dominance. The question is whether that dynasty continues or fractures under the weight of an all-in gamble.",
+    teams: ["IceMonkey","Fenrir's Fury","Warrior Shohei Goatani","Orion Leaf"],
+    s1champ: "IceMonkey",
+    terrain: "Ice mountains, frozen tundra, aurora skies",
+    motto: "The cold does not forgive. Neither do we."
+  },
+  2: {
+    title: "The Golden Shores of the Celestial South",
+    lore: "Where the sun never sets and the stakes never lower, the Celestial South burns with the hunger of gods. This division plays fast, trades big, and bets everything. Hermes Hail Marys traded away every single future pick — all-in on the current roster. The South does not rebuild. It either wins or it burns. Stefanos arrives as a new Spartan King, hungry for a realm with no prior losses to haunt him. The South is the gambler's division — and in Season 2, the chips are all on the table.",
+    teams: ["Hermes Hail Marys","Wrath of Moctezuma","Beercules the Destroyer","Stefanos the Spartan King"],
+    s1champ: "Hermes Hail Marys",
+    terrain: "Golden coastlines, sun temples, palm shores",
+    motto: "Fortune favors the bold. The South favors no one."
+  },
+  3: {
+    title: "The Mystic Depths of the Ethereal East",
+    lore: "Ancient. Patient. Inevitable. The Ethereal East does not rush to victory — it lets victory find its way through the mist. Lord of Dreams finished S1 at 11-3, a third-place titan who plays with quiet dominance. Notchotaur led the entire league in points despite an unlucky record. Talon has hoarded more draft picks than anyone — the future belongs to him. The East does not clash loudly. It simply endures until everyone else has fallen.",
+    teams: ["Lord of Dreams","Notchotaur","Lord Jefita Clapper","Talon"],
+    s1champ: "Lord of Dreams",
+    terrain: "Enchanted forests, glowing pathways, ancient ruins",
+    motto: "What endures in the dark outlasts what burns in the light."
+  },
+  4: {
+    title: "The Volcanic Badlands of the Primordial West",
+    lore: "Forged in fire and chaos, the Primordial West is where the bold go to prove themselves. ChatG-TDs went 13-1 in S1 — undefeated in the regular season — only to fall in the championship. The algorithm does not forget. Heir of Zeus, the Commissioner himself, suffered a 1-13 record in S1 and comes into Season 2 with a throne to reclaim and thunder to unleash. The West is unpredictable, explosive, and utterly dangerous when it locks in.",
+    teams: ["ChatG-TDs","Dewie Slayer of Bakunawa","Son of Rander","Heir of Zeus"],
+    s1champ: "ChatG-TDs",
+    terrain: "Volcanic peaks, lava rivers, ash-covered plains",
+    motto: "From the primordial fire, only the worthy emerge."
+  }
+};
+
+var activeDivision = null;
+
+function showDivision(divId) {
+  activeDivision = divId;
+  // Switch to realm map tab
+  var realmBtn = null;
+  document.querySelectorAll('.nb').forEach(function(b){
+    if (b.getAttribute('onclick') && b.getAttribute('onclick').indexOf('realmmap') !== -1) realmBtn = b;
+  });
+  showTab('realmmap', realmBtn);
+  // Scroll to top
+  window.scrollTo(0, 0);
+  // Re-render to show division bio
+  setTimeout(function(){ renderRealmMap(); }, 50);
+}
 
 var EMOJIS = {
   icemonkey:'❄️',fenrir:'🐺',warrior:'🥷',orion:'🍁',
@@ -654,7 +705,7 @@ function renderStandings() {
     var info = DIVMAP[did] || {name:'Division '+did, icon:'⚔'};
     var block = document.createElement('div');
     block.className = 'div-block';
-    block.innerHTML = '<div class="div-head"><span style="font-size:18px">'+info.icon+'</span><h3>'+info.name+'</h3></div>';
+    block.innerHTML = '<div class="div-head" style="cursor:pointer" onclick="showDivision('+did+')" title="View division lore"><span style="font-size:18px">'+info.icon+'</span><h3>'+info.name+'</h3><span style="font-family:Cinzel,serif;font-size:8px;color:var(--gold);margin-left:auto;letter-spacing:1px">VIEW REALM →</span></div>';
     divs[did].forEach(function(r, i) {
       var u   = getUser(r.owner_id);
       var tn  = tname(r, u);
@@ -1930,6 +1981,53 @@ function renderRealmMap() {
     + '</div>';
 
   html += '</div>'; // end outer
+
+  // ── DIVISION BIO SECTION ──
+  var BASE_IMG2 = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
+  html += '<div style="margin-top:1.5rem">';
+  html += '<div class="stitle">⚔ Division Lore</div>';
+
+  // Division crest buttons row
+  html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.2rem">';
+  [1,2,3,4].forEach(function(did) {
+    var di = DIVMAP[did];
+    var isActive = activeDivision == did;
+    html += '<div onclick="activeDivision='+did+';renderRealmMap()" style="cursor:pointer;text-align:center;padding:10px 8px;border-radius:12px;border:2px solid '+(isActive?di.color:'var(--gold-border)')+';background:'+(isActive?'rgba(201,168,76,.08)':'transparent')+';transition:all .2s">'
+      + '<img src="'+BASE_IMG2+di.crest+'" style="width:56px;height:56px;object-fit:contain;display:block;margin:0 auto 6px" onerror="this.remove()">'
+      + '<div style="font-family:Cinzel,serif;font-size:9px;font-weight:700;color:'+(isActive?di.color:'var(--dim)')+';letter-spacing:1px">'+di.icon+' '+di.name+'</div>'
+      + '</div>';
+  });
+  html += '</div>';
+
+  // Active division bio
+  if (activeDivision && DIV_BIOS[activeDivision]) {
+    var db = DIV_BIOS[activeDivision];
+    var dm = DIVMAP[activeDivision];
+    html += '<div style="background:linear-gradient(135deg,var(--navy-card),var(--navy-mid));border:1px solid '+dm.color+';border-radius:14px;overflow:hidden">'
+      // Header
+      + '<div style="background:linear-gradient(90deg,rgba('+( dm.color==='#7BB8E8'?'123,184,232':dm.color==='#FFB347'?'255,179,71':dm.color==='#6EDE7E'?'110,222,126':'255,107,107' )+',.15),transparent);padding:16px 20px;border-bottom:1px solid rgba(255,255,255,.06)">'
+      +   '<div style="font-family:Cinzel Decorative,serif;font-size:14px;color:'+dm.color+';letter-spacing:1px;margin-bottom:4px">'+db.title+'</div>'
+      +   '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:2px">'+db.terrain+'</div>'
+      + '</div>'
+      // Lore text
+      + '<div style="padding:16px 20px;font-family:EB Garamond,serif;font-size:14px;color:var(--text);line-height:1.8">'+db.lore+'</div>'
+      // Motto
+      + '<div style="padding:10px 20px 16px;border-top:1px solid rgba(255,255,255,.06)">'
+      +   '<div style="font-family:Cinzel,serif;font-size:11px;color:'+dm.color+';font-style:italic;letter-spacing:1px">"'+db.motto+'"</div>'
+      + '</div>'
+      // Teams
+      + '<div style="padding:12px 20px 16px;border-top:1px solid rgba(255,255,255,.06);display:flex;gap:8px;flex-wrap:wrap">';
+    db.teams.forEach(function(tn) {
+      var mgr = MANAGERS.find(function(m){ return m.name===tn; }) || {};
+      var isChamp = tn === db.s1champ;
+      html += '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(255,255,255,.06);color:'+(isChamp?dm.color:'var(--text)')+';border:1px solid '+(isChamp?dm.color:'rgba(255,255,255,.1)')+'">'+( mgr.emoji||'' )+' '+tn+(isChamp?' 👑 S1':'' )+'</span>';
+    });
+    html += '</div></div>';
+  } else {
+    html += '<div style="text-align:center;font-family:Cinzel,serif;font-size:12px;color:var(--dim);padding:1.5rem">Click a division above — or a division name in Standings — to read its lore ⚔</div>';
+  }
+  html += '</div>'; // end lore section
+
   wrap.innerHTML = html;
 
   // ── TOOLTIP EVENTS ──
