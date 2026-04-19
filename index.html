@@ -877,6 +877,52 @@ function viewRoster(rosterId, switchTab) {
     html += ownedHTML;
   }
 
+  // ── PROFILE CARD (injected into roster tab) ──────────────────
+  var _BIOS  = (typeof MANAGER_BIOS  !== 'undefined') ? MANAGER_BIOS  : {};
+  var _S1S   = (typeof S1_STATS      !== 'undefined') ? S1_STATS      : {};
+  var _PICKS = (typeof PICK_COUNTS   !== 'undefined') ? PICK_COUNTS   : {};
+  var _bio   = _BIOS[tn] || {};
+  var _s1    = _S1S[tn]     || {w:0,l:0,pts:0,result:'new',pf_rank:0};
+  var _picks = _PICKS[tn] || 0  || 0;
+  var _mgr   = MANAGERS.find(function(x){ return x.name===tn; }) || {};
+  var _titan = (typeof getTitanHistory==='function') ? getTitanHistory().filter(function(t){ return t.name===tn; }) : [];
+  var _rc    = _s1.result==='champion'?'var(--gold)':_s1.result==='runner-up'?'#CCC':_s1.result==='third'?'#CD7F32':_s1.result==='basement'?'var(--red)':_s1.result==='new'?'var(--blue)':'var(--dim)';
+  var _rl    = _s1.result==='champion'?'🏆 S1 Champion':_s1.result==='runner-up'?'🥈 S1 Runner-Up':_s1.result==='third'?'🥉 S1 Third Place':_s1.result==='basement'?'💀 S1 Basement':_s1.result==='new'?'🆕 Season 2 Debut':_s1.result==='playoff'?'🏅 Made Playoffs':'📊 Regular Season';
+
+  html += '<div class="rdsec">Manager Profile</div>'
+    + '<div style="background:linear-gradient(135deg,rgba(201,168,76,.06),transparent);padding:14px 16px 16px">'
+    + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">'
+    +   '<span style="font-size:28px">'+(_mgr.emoji||'👤')+'</span>'
+    +   '<div style="flex:1">'
+    +     '<div style="font-family:Cinzel,serif;font-size:12px;font-weight:700;color:var(--gold)">'+(_bio.title||tn)+'</div>'
+    +     '<div style="font-size:11px;color:var(--dim);font-style:italic;margin-top:2px">'+(_bio.tagline||'')+'</div>'
+    +   '</div>'
+    +   (_bio.accolade ? '<span style="font-family:Cinzel,serif;font-size:8px;font-weight:700;padding:3px 8px;border-radius:8px;background:rgba(201,168,76,.1);color:var(--gold);border:1px solid var(--gold-border);white-space:nowrap">'+_bio.accolade+'</span>' : '')
+    + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
+    +   '<div style="background:rgba(0,0,0,.25);border-radius:8px;padding:9px 12px">'
+    +     '<div style="font-family:Cinzel,serif;font-size:8px;letter-spacing:2px;color:var(--dim);margin-bottom:4px">SEASON 1</div>'
+    +     (_s1.result==='new'
+          ? '<div style="font-family:Cinzel,serif;font-size:12px;color:var(--blue)">New to the realm</div>'
+          : '<div style="font-family:Cinzel,serif;font-size:17px;font-weight:700;color:var(--gold)">'+_s1.w+'-'+_s1.l+'</div>'
+          + '<div style="font-size:10px;color:var(--dim)">'+_s1.pts.toFixed(1)+' PF · League #'+_s1.pf_rank+'</div>'
+          + '<div style="font-size:10px;color:'+_rc+';font-weight:700;margin-top:3px">'+_rl+'</div>')
+    +   '</div>'
+    +   '<div style="background:rgba(0,0,0,.25);border-radius:8px;padding:9px 12px">'
+    +     '<div style="font-family:Cinzel,serif;font-size:8px;letter-spacing:2px;color:var(--dim);margin-bottom:4px">SEASON 2</div>'
+    +     '<div style="font-family:Cinzel,serif;font-size:17px;font-weight:700;color:var(--gold)">'+w+'-'+l+'</div>'
+    +     '<div style="font-size:10px;color:var(--dim)">'+pts+' PF · In progress</div>'
+    +     '<div style="font-size:10px;color:var(--blue);font-weight:700;margin-top:3px">⚡ Active</div>'
+    +   '</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
+    +   '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(201,168,76,.1);color:var(--gold);border:1px solid var(--gold-border)">🎯 '+_picks+' picks (2026-28)</span>'
+    +   (_bio.shame ? '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,107,107,.1);color:var(--red);border:1px solid rgba(255,107,107,.2)">'+_bio.shame+'</span>' : '')
+    +   (!_mgr.paid ? '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,179,71,.1);color:var(--amber);border:1px solid rgba(255,179,71,.2)">⏳ Buy-in pending</span>' : '')
+    +   (_titan.length ? '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(201,168,76,.15);color:var(--gold);border:1px solid var(--gold-border)">👑 Titan ×'+_titan.length+'</span>' : '')
+    + '</div>'
+    + '</div>';
+
   document.getElementById('rdisplay').innerHTML = html;
 }
 
@@ -1374,10 +1420,10 @@ var MANAGERS = [
   {name:"Hermes Hail Marys",     username:"Dsides",         emoji:"🪽", paid:true},
   {name:"Wrath of Moctezuma",    username:"Moctezuma",      emoji:"🔥", paid:true},
   {name:"Beercules the Destroyer",username:"isaiahsc23",    emoji:"🍺", paid:true},
-  {name:"Stefanos the Spartan King",username:"StefanSandalis",emoji:"🪖",paid:false},
+  {name:"Stefanos the Spartan King",username:"StefanSandalis",emoji:"🪖",paid:true},
   {name:"Lord of Dreams",        username:"LordofDreams",   emoji:"🔮", paid:true},
   {name:"Notchotaur",            username:"Notchanator",    emoji:"🐂", paid:true},
-  {name:"Lord Jefita Clapper",   username:"Peanutzm3",      emoji:"🩴", paid:true},
+  {name:"Lord Jefita Clapper",   username:"Peanutzm3",      emoji:"🩴", paid:false},
   {name:"Talon",                 username:"HiLine",         emoji:"🪄", paid:true},
   {name:"ChatG-TDs",             username:"SteveG25",       emoji:"🤖", paid:true},
   {name:"Dewie Slayer of Bakunawa",username:"dewdaddy",     emoji:"🐍", paid:true},
@@ -1430,10 +1476,15 @@ function applyTreasuryData(rows) {
   });
 }
 
+function getTitanOfWeek() { try { return JSON.parse(localStorage.getItem('titanOfWeek')||'null'); } catch(e){ return null; } }
+function saveTitanOfWeek(d) { localStorage.setItem('titanOfWeek', JSON.stringify(d)); }
+function getTitanHistory() { try { return JSON.parse(localStorage.getItem('titanHistory')||'[]'); } catch(e){ return []; } }
+
 function renderTreasury() {
   var wrap = document.getElementById('treasurywrap');
   var amt  = getTreasury();
   var paid = MANAGERS.filter(function(m){return m.paid;}).length;
+  var pending = 16 - paid;
 
   var syncIndicator = sbReady()
     ? '<span style="font-size:9px;color:var(--green);font-family:Cinzel,serif;letter-spacing:1px">● LIVE SYNC</span>'
@@ -1442,35 +1493,128 @@ function renderTreasury() {
   var html = '<div class="treasury-hero">'
     + '<div style="font-family:Cinzel Decorative,serif;font-size:14px;color:var(--gold);letter-spacing:3px;margin-bottom:.5rem">⚔ TITAN TREASURY ⚔</div>'
     + '<div class="treasury-amount">$'+amt.toFixed(2)+'</div>'
-    + '<div style="font-size:12px;color:var(--dim);margin-top:8px;font-family:Cinzel,serif;letter-spacing:1px">Held on Kraken · $10/manager/season · 5% withdrawable per champion<br>'
-    + '<strong style="color:var(--gold)">'+paid+'/16</strong> tributes paid this season &nbsp;'+syncIndicator+'</div>'
+    + '<div style="font-size:12px;color:var(--dim);margin-top:8px;font-family:Cinzel,serif;letter-spacing:1px">Held on Kraken · $110/manager buy-in · Season 2<br>'
+    + '<strong style="color:var(--gold)">'+paid+'/16</strong> tributes paid'+(pending ? ' · <strong style="color:var(--amber)">'+pending+' pending</strong>' : ' · <strong style="color:var(--green)">All paid!</strong>')+'&nbsp;&nbsp;'+syncIndicator+'</div>'
     + '<div style="display:flex;gap:10px;justify-content:center;margin-top:1rem;flex-wrap:wrap">'
     + '<button onclick="updateTreasury()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:8px 20px;border-radius:20px;border:1px solid var(--gold-border);background:transparent;color:var(--gold);cursor:pointer">✏ Update Balance</button>'
     + '<a href="https://www.kraken.com/u/AA63N84GWGPCA4UY" target="_blank" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:8px 20px;border-radius:20px;border:1px solid rgba(123,184,232,.3);color:var(--blue);text-decoration:none">🔗 View on Kraken</a>'
     + '</div></div>';
 
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">'
-    + '<div class="tr-card"><div class="tr-card-title">Rules</div>'
-    + '<div style="font-size:13px;color:var(--text);line-height:1.7">$10/manager deposited each season<br>Only 5% claimable per champion<br>Remainder rolls to next season<br>Commissioner holds on Kraken<br>🏆 S1 Champ: IceMonkey</div></div>'
-    + '<div class="tr-card"><div class="tr-card-title">Projections</div>'
-    + '<div style="font-size:13px;color:var(--text);line-height:1.7">S1: $160 deposited<br>S2: +$160 → <strong style="color:var(--gold)">$320</strong><br>Champion can claim: <strong style="color:var(--gold)">$16</strong><br>5 seasons: <strong style="color:var(--gold)">$800+</strong><br>10 seasons: <strong style="color:var(--gold)">$1,600+</strong></div></div>'
+  // ── PRIZE BREAKDOWN ──
+  html += '<div class="stitle" style="margin-top:1.5rem">🏆 Season 2 Prize Pool</div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1.5rem">'
+    + '<div style="background:linear-gradient(135deg,rgba(201,168,76,.18),rgba(201,168,76,.04));border:1px solid var(--gold-border);border-radius:12px;padding:14px;text-align:center">'
+    +   '<div style="font-size:26px;margin-bottom:4px">🥇</div>'
+    +   '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:2px;margin-bottom:4px">CHAMPION</div>'
+    +   '<div style="font-family:Cinzel,serif;font-size:24px;font-weight:700;color:var(--gold)">$900</div>'
+    + '</div>'
+    + '<div style="background:linear-gradient(135deg,rgba(192,192,192,.12),rgba(192,192,192,.03));border:1px solid rgba(192,192,192,.2);border-radius:12px;padding:14px;text-align:center">'
+    +   '<div style="font-size:26px;margin-bottom:4px">🥈</div>'
+    +   '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:2px;margin-bottom:4px">RUNNER-UP</div>'
+    +   '<div style="font-family:Cinzel,serif;font-size:24px;font-weight:700;color:#CCC">$300</div>'
+    + '</div>'
+    + '<div style="background:linear-gradient(135deg,rgba(205,127,50,.12),rgba(205,127,50,.03));border:1px solid rgba(205,127,50,.2);border-radius:12px;padding:14px;text-align:center">'
+    +   '<div style="font-size:26px;margin-bottom:4px">🥉</div>'
+    +   '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:2px;margin-bottom:4px">THIRD PLACE</div>'
+    +   '<div style="font-family:Cinzel,serif;font-size:24px;font-weight:700;color:#CD7F32">$120</div>'
+    + '</div>'
     + '</div>';
 
+  // Weekly warrior row
+  html += '<div style="background:rgba(201,168,76,.06);border:1px solid var(--gold-border);border-radius:10px;padding:12px 16px;margin-bottom:1.5rem;display:flex;align-items:center;gap:12px">'
+    + '<div style="font-size:22px">👑</div>'
+    + '<div style="flex:1"><div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:var(--gold)">Weekly Warrior Prize</div>'
+    + '<div style="font-size:12px;color:var(--dim);font-family:Cinzel,serif">Top scorer each week, Weeks 1–14</div></div>'
+    + '<div style="font-family:Cinzel,serif;font-size:20px;font-weight:700;color:var(--gold)">$20<span style="font-size:10px;color:var(--dim)">/wk</span></div>'
+    + '</div>';
+
+  // ── TITAN OF THE WEEK ──
+  var titan = getTitanOfWeek();
+  var titanHistory = getTitanHistory();
+  html += '<div class="stitle">👑 Titan of the Week</div>';
+  html += '<div style="background:linear-gradient(135deg,#1A1400,#2A2000);border:2px solid var(--gold);border-radius:14px;padding:1.2rem 1.5rem;margin-bottom:1.5rem">';
+  if (titan) {
+    var tm = MANAGERS.find(function(x){ return x.name === titan.name; }) || {};
+    html += '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">'
+      + '<div style="font-size:40px">'+(tm.emoji||'👑')+'</div>'
+      + '<div style="flex:1">'
+      +   '<div style="font-family:Cinzel Decorative,serif;font-size:13px;color:var(--gold)">'+titan.name+'</div>'
+      +   '<div style="font-size:12px;color:var(--dim);font-family:Cinzel,serif;margin-top:3px">Week '+titan.week+(titan.pts?' · '+titan.pts+' pts':'')+(titan.player?' · '+titan.player:'')+'</div>'
+      + '</div>'
+      + '<div style="text-align:center">'
+      +   '<div style="font-family:Cinzel,serif;font-size:28px;font-weight:700;color:var(--gold)">$20</div>'
+      +   '<div style="font-size:9px;color:var(--dim);font-family:Cinzel,serif;letter-spacing:1px">WEEKLY WARRIOR</div>'
+      + '</div></div>';
+  } else {
+    html += '<div style="text-align:center;font-family:Cinzel,serif;font-size:12px;color:var(--dim);letter-spacing:1px;padding:.5rem 0">No Titan crowned yet · Commissioner awards each week</div>';
+  }
+  html += '<div style="margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">'
+    + '<button onclick="crownTitan()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:7px 18px;border-radius:16px;border:1px solid var(--gold);background:transparent;color:var(--gold);cursor:pointer">👑 Crown Titan</button>'
+    + (titanHistory.length ? '<button onclick="showTitanHistory()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:7px 18px;border-radius:16px;border:1px solid var(--gold-border);background:transparent;color:var(--dim);cursor:pointer">📜 Hall of Titans ('+titanHistory.length+')</button>' : '')
+    + '</div>';
+  if (titanHistory.length) {
+    html += '<div id="titanHistWrap" style="display:none;margin-top:12px;border-top:1px solid var(--gold-border);padding-top:12px">';
+    titanHistory.slice().reverse().forEach(function(t) {
+      var hm = MANAGERS.find(function(x){ return x.name === t.name; }) || {};
+      html += '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)">'
+        + '<span style="font-size:16px">'+(hm.emoji||'👑')+'</span>'
+        + '<span style="font-family:Cinzel,serif;font-size:11px;color:var(--text);flex:1">'+t.name+'</span>'
+        + '<span style="font-family:Cinzel,serif;font-size:10px;color:var(--dim)">Wk '+t.week+'</span>'
+        + '<span style="font-family:Cinzel,serif;font-size:11px;color:var(--gold)">'+t.pts+' pts</span>'
+        + '</div>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // ── RULES ──
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">'
+    + '<div class="tr-card"><div class="tr-card-title">Treasury Rules</div>'
+    + '<div style="font-size:13px;color:var(--text);line-height:1.8">$110 buy-in per season<br>🥇 Champion: $900<br>🥈 Runner-Up: $300<br>🥉 Third: $120<br>👑 Weekly Warrior: $20/wk (Wks 1–14)<br>🏆 S1 Champion: IceMonkey</div></div>'
+    + '<div class="tr-card"><div class="tr-card-title">S2 Breakdown</div>'
+    + '<div style="font-size:13px;color:var(--text);line-height:1.8">16 × $110 = <strong style="color:var(--gold)">$1,760</strong><br>Weekly Warriors: <strong style="color:var(--gold)">$280</strong> (14 wks)<br>Prizes paid out: <strong style="color:var(--gold)">$1,320</strong><br>Rolls to S3: ~$440<br>5-season pot: <strong style="color:var(--gold)">$8,800+</strong></div></div>'
+    + '</div>';
+
+  // ── TRIBUTE STATUS ──
   html += '<div class="stitle">Season 2 Tribute Status</div>';
-  MANAGERS.forEach(function(m) {
-    html += '<div class="contrib-row" style="cursor:pointer" onclick="togglePaid(\''+m.username+'\',\''+m.name+'\')">'
+  var sorted = MANAGERS.slice().sort(function(a,b){ return (b.paid?1:0)-(a.paid?1:0); });
+  sorted.forEach(function(m) {
+    html += '<div class="contrib-row" style="cursor:pointer" onclick="togglePaid(this)" data-un="'+m.username+'" data-tn="'+m.name+'">'  
       + '<span style="font-size:18px">'+m.emoji+'</span>'
       + '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:600;color:var(--text);flex:1">'+m.name+'</div>'
-      + '<div style="font-family:Cinzel,serif;font-size:13px;font-weight:700;color:var(--gold)">$10</div>'
-      + '<span class="'+(m.paid?'cs-paid':'cs-pending')+'">'+(m.paid?'✓ Paid':'Pending')+'</span>'
+      + '<div style="font-family:Cinzel,serif;font-size:13px;font-weight:700;color:var(--gold)">$110</div>'
+      + '<span class="'+(m.paid?'cs-paid':'cs-pending')+'">'+(m.paid?'✓ Paid':'⏳ Pending')+'</span>'
       + '</div>';
   });
-
   html += '<div style="margin-top:12px;font-size:10px;color:var(--dim);font-family:Cinzel,serif;text-align:center;font-style:italic">Commissioner: tap any row to toggle paid status</div>';
   wrap.innerHTML = html;
 }
 
-async function togglePaid(username, teamName) {
+function showTitanHistory() {
+  var el = document.getElementById('titanHistWrap');
+  if (el) el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
+
+function crownTitan() {
+  var list = MANAGERS.map(function(m,i){ return (i+1)+'. '+m.name; }).join('\n');
+  var input = prompt('Crown Titan of the Week — enter team name:\n\n'+list);
+  if (!input) return;
+  var match = MANAGERS.find(function(m){ return m.name.toLowerCase().includes(input.toLowerCase()); });
+  if (!match) { alert('Team not found. Try again.'); return; }
+  var week = parseInt(prompt('Week number:', S.week||1))||1;
+  var pts  = prompt('Score this week (e.g. 158.4):', '')||'—';
+  var player = prompt('Star player? (optional, e.g. Josh Allen 44pts)', '')||'';
+  var titan = { name:match.name, week:week, pts:pts, player:player };
+  saveTitanOfWeek(titan);
+  var hist = getTitanHistory().filter(function(t){ return t.week!==week; });
+  hist.push(titan);
+  localStorage.setItem('titanHistory', JSON.stringify(hist));
+  renderTreasury();
+}
+
+async function togglePaid(el) {
+  var username = el ? el.dataset.un : '';
+  var teamName = el ? el.dataset.tn : '';
   var m = MANAGERS.find(function(x){ return x.username === username; });
   if (!m) return;
   var newPaid = !m.paid;
@@ -2377,7 +2521,6 @@ function spinWheel() {
 
 function renderAll() {
   renderStandings();
-  renderRecap();
   renderRosterBtns();
   renderPicks();
   renderTransactions();
@@ -2392,6 +2535,10 @@ function renderAll() {
 }
 
 renderAll();
+// Deferred renders — these functions are defined later in the file
+setTimeout(function() {
+  if (typeof renderRecap === 'function') renderRecap();
+}, 0);
 document.getElementById('hmeta').textContent = 'Connecting to Sleeper...';
 
 Promise.all([
@@ -2786,13 +2933,129 @@ async function generateRecap() {
     saveRecap(weekNum, text, scores, parsedMatchups, transactions, notes);
 
     if (status) { status.textContent = '✅ Chronicle forged! The realm remembers.'; status.style.color = 'var(--green)'; }
-    renderRecap();
+  
 
   } catch(e) {
     console.error('Recap generation failed:', e);
     if (status) { status.textContent = '⚠ The scribes faltered: ' + e.message; status.style.color = 'var(--red)'; }
     if (btn) { btn.disabled = false; btn.textContent = '⚔ FORGE THE CHRONICLE'; }
   }
+}
+
+
+// ── MANAGER PROFILE CARDS ─────────────────────────────────────
+var S1_STATS = {
+  "IceMonkey":              {w:10,l:4,pts:1772.5,pf_rank:4,result:'champion',   pa:1601.2},
+  "Fenrir's Fury":          {w:8, l:6,pts:1698.3,pf_rank:7,result:'playoff',    pa:1622.1},
+  "Warrior Shohei Goatani": {w:7, l:7,pts:1743.2,pf_rank:5,result:'missed',     pa:1710.4},
+  "Orion Leaf":             {w:1, l:13,pts:1301.4,pf_rank:15,result:'basement',  pa:1820.1},
+  "Hermes Hail Marys":      {w:7, l:7,pts:1589.4,pf_rank:9,result:'playoff',    pa:1644.3},
+  "Wrath of Moctezuma":     {w:5, l:9,pts:1544.2,pf_rank:11,result:'missed',    pa:1688.2},
+  "Beercules the Destroyer":{w:3, l:11,pts:1412.1,pf_rank:13,result:'missed',   pa:1744.3},
+  "Stefanos the Spartan King":{w:0,l:0,pts:0,pf_rank:0,result:'new',            pa:0},
+  "Lord of Dreams":         {w:11,l:3,pts:1576.7,pf_rank:10,result:'third',     pa:1522.4},
+  "Notchotaur":             {w:8, l:6,pts:1889.0,pf_rank:1,result:'playoff',    pa:1701.2},
+  "Lord Jefita Clapper":    {w:8, l:6,pts:1744.8,pf_rank:6,result:'playoff',    pa:1688.1},
+  "Talon":                  {w:6, l:8,pts:1601.3,pf_rank:8,result:'missed',     pa:1655.2},
+  "ChatG-TDs":              {w:13,l:1,pts:1820.6,pf_rank:2,result:'runner-up',  pa:1544.2},
+  "Dewie Slayer of Bakunawa":{w:7,l:7,pts:1541.2,pf_rank:12,result:'missed',   pa:1601.4},
+  "Son of Rander":          {w:5, l:9,pts:1488.3,pf_rank:14,result:'missed',    pa:1644.2},
+  "Heir of Zeus":           {w:1, l:13,pts:1344.2,pf_rank:16,result:'basement', pa:1788.3}
+};
+
+var MANAGER_BIOS = {
+  "IceMonkey":              {title:"The Reigning King",     tagline:"Won it all in S1. Trading futures for another crown.",        shame:null,          accolade:"🏆 S1 Champion"},
+  "Fenrir's Fury":          {title:"The Runic Wolf",        tagline:"Consistent, dangerous, always in the hunt.",                 shame:null,          accolade:"🐺 Division Contender"},
+  "Warrior Shohei Goatani": {title:"The Streaky Samurai",   tagline:"Elite points, mid-table results. Fixes lineups, wins rings.", shame:null,          accolade:"🥷 Points Machine"},
+  "Orion Leaf":             {title:"The Northern Leaf",     tagline:"S1 1-13 survivor. Has the receipts. Time to cash them in.",  shame:"💀 S1 Co-Basement",accolade:"🍁 Redemption Arc"},
+  "Hermes Hail Marys":      {title:"The All-In Messenger",  tagline:"Traded everything for S2. One pick. No safety net. Bold.",   shame:null,          accolade:"🪽 Ultimate Gambler"},
+  "Wrath of Moctezuma":     {title:"The Fire Starter",      tagline:"Dangerous in flashes. Needs consistency to go deep.",        shame:null,          accolade:"🔥 Streaky Threat"},
+  "Beercules the Destroyer": {title:"The Keg Stand",        tagline:"Full pick slate. The chaos agent of the Celestial South.",   shame:"💀 S1 Co-Basement-ish", accolade:"🍺 Full Reload"},
+  "Stefanos the Spartan King":{title:"The Spartan Newcomer", tagline:"Fresh to the realm. No baggage, no ceiling.",               shame:null,          accolade:"🪖 Season 2 Debut"},
+  "Lord of Dreams":         {title:"The Third-Place Titan", tagline:"11-3 in S1. Win-now mode. Traded futures to Talon.",         shame:null,          accolade:"🥉 S1 Third Place"},
+  "Notchotaur":             {title:"The Points Destroyer",  tagline:"S1 points leader at 1889. Bad luck record. Watch out.",      shame:null,          accolade:"🐂 S1 PF Leader"},
+  "Lord Jefita Clapper":    {title:"The Clutch Clapper",    tagline:"Owns all 9 picks. Consistent performer. Ready to ascend.",   shame:null,          accolade:"🩴 Full Capital"},
+  "Talon":                  {title:"The Draft Hoarder",     tagline:"Most picks in the league — by far. The future belongs to him.", shame:null,        accolade:"🪄 Pick King"},
+  "ChatG-TDs":              {title:"The Algorithm",         tagline:"13-1 in S1, runner-up. Traded futures. All-in, no regrets.", shame:null,          accolade:"🥈 S1 Runner-Up"},
+  "Dewie Slayer of Bakunawa":{title:"The Silent Slayer",    tagline:"Full picks, no trades, no noise. Deadly patience.",          shame:null,          accolade:"🐍 Full Arsenal"},
+  "Son of Rander":          {title:"The Patient Son",       tagline:"All 9 picks intact. Waiting for the perfect moment.",        shame:null,          accolade:"🌳 Clean Slate"},
+  "Heir of Zeus":           {title:"The Commissioner",      tagline:"1-13 in S1, but holds the thunderbolt. S2 is personal.",    shame:"💀 S1 Co-Basement",accolade:"⚡ Redemption Season"}
+};
+
+var PICK_COUNTS = {
+  "IceMonkey":3,"Fenrir's Fury":7,"Warrior Shohei Goatani":8,"Orion Leaf":9,
+  "Hermes Hail Marys":1,"Wrath of Moctezuma":9,"Beercules the Destroyer":9,"Stefanos the Spartan King":8,
+  "Lord of Dreams":7,"Notchotaur":8,"Lord Jefita Clapper":9,"Talon":19,
+  "ChatG-TDs":7,"Dewie Slayer of Bakunawa":9,"Son of Rander":9,"Heir of Zeus":8
+};
+
+function renderProfiles() {
+  var wrap = document.getElementById('profileswrap');
+  if (!wrap) return;
+
+  var html = '<div style="background:var(--gold-dim);border:1px solid var(--gold-border);border-radius:10px;padding:12px 16px;margin-bottom:1.5rem;font-family:Cinzel,serif;font-size:11px;color:var(--dim);line-height:1.7">'
+    + '<strong style="color:var(--gold)">Manager Profile Cards</strong> · Career stats across S1 + S2 · Click any card to expand'
+    + '</div>';
+
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">';
+
+  MANAGERS.forEach(function(m) {
+    var s1 = S1_STATS[m.name] || {w:0,l:0,pts:0,result:'—',pf_rank:0};
+    var bio = MANAGER_BIOS[m.name] || {title:'',tagline:'',shame:null,accolade:''};
+    var picks = PICK_COUNTS[m.name] || 0;
+
+    // S2 from live data
+    var s2roster = S.rosters.find(function(r){ var u=getUser(r.owner_id); return resolveTeamName(r,u)===m.name; });
+    var s2w = s2roster && s2roster.settings ? s2roster.settings.wins||0 : 0;
+    var s2l = s2roster && s2roster.settings ? s2roster.settings.losses||0 : 0;
+    var s2pts = s2roster && s2roster.settings ? ((s2roster.settings.fpts||0)+(s2roster.settings.fpts_decimal||0)/100).toFixed(1) : '0.0';
+
+    var resultColor = s1.result==='champion'?'var(--gold)':s1.result==='runner-up'?'#CCC':s1.result==='third'?'#CD7F32':s1.result==='basement'?'var(--red)':s1.result==='new'?'var(--blue)':'var(--dim)';
+
+    html += '<div style="background:linear-gradient(135deg,var(--navy-card),var(--navy-mid));border:1px solid var(--gold-border);border-radius:14px;overflow:hidden;transition:border-color .2s">'
+      // Header banner
+      + '<div style="background:linear-gradient(90deg,rgba(201,168,76,.12),transparent);padding:12px 16px;border-bottom:1px solid rgba(201,168,76,.1);display:flex;align-items:center;gap:12px">'
+      +   '<span style="font-size:30px;line-height:1">' + m.emoji + '</span>'
+      +   '<div style="flex:1;min-width:0">'
+      +     '<div style="font-family:Cinzel,serif;font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + m.name + '</div>'
+      +     '<div style="font-size:10px;color:var(--gold);font-family:Cinzel,serif;margin-top:1px">' + bio.title + '</div>'
+      +   '</div>'
+      +   '<span style="font-family:Cinzel,serif;font-size:8px;font-weight:700;letter-spacing:1px;padding:3px 8px;border-radius:8px;background:rgba(201,168,76,.1);color:var(--gold);border:1px solid var(--gold-border);white-space:nowrap">' + bio.accolade + '</span>'
+      + '</div>'
+      // Stats grid
+      + '<div style="padding:12px 16px">'
+      +   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">'
+      // S1 stats
+      +     '<div style="background:rgba(0,0,0,.2);border-radius:8px;padding:8px 10px">'
+      +       '<div style="font-family:Cinzel,serif;font-size:8px;letter-spacing:2px;color:var(--dim);margin-bottom:4px">SEASON 1</div>'
+      +       (s1.result==='new'
+          ? '<div style="font-family:Cinzel,serif;font-size:13px;color:var(--blue)">New to realm</div>'
+          : '<div style="font-family:Cinzel,serif;font-size:16px;font-weight:700;color:var(--gold)">' + s1.w + '-' + s1.l + '</div>'
+          + '<div style="font-size:10px;color:var(--dim)">' + s1.pts.toFixed(1) + ' PF · Rank #'+s1.pf_rank+'</div>'
+          + '<div style="font-size:10px;color:'+resultColor+';font-family:Cinzel,serif;margin-top:2px;font-weight:700">' + (s1.result==='champion'?'🏆 Champion':s1.result==='runner-up'?'🥈 Runner-Up':s1.result==='third'?'🥉 Third':s1.result==='basement'?'💀 Basement':s1.result==='playoff'?'🏅 Playoffs':'📊 Regular Season') + '</div>')
+      +     '</div>'
+      // S2 stats
+      +     '<div style="background:rgba(0,0,0,.2);border-radius:8px;padding:8px 10px">'
+      +       '<div style="font-family:Cinzel,serif;font-size:8px;letter-spacing:2px;color:var(--dim);margin-bottom:4px">SEASON 2</div>'
+      +       '<div style="font-family:Cinzel,serif;font-size:16px;font-weight:700;color:var(--gold)">' + s2w + '-' + s2l + '</div>'
+      +       '<div style="font-size:10px;color:var(--dim)">' + s2pts + ' PF · In progress</div>'
+      +       '<div style="font-size:10px;color:var(--blue);font-family:Cinzel,serif;margin-top:2px">⚡ Season 2 Active</div>'
+      +     '</div>'
+      +   '</div>'
+      // Tagline
+      +   '<div style="font-size:12px;color:var(--dim);font-style:italic;line-height:1.5;margin-bottom:8px">' + bio.tagline + '</div>'
+      // Picks + shame badges
+      +   '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'
+      +     '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(201,168,76,.1);color:var(--gold);border:1px solid var(--gold-border)">🎯 ' + picks + ' picks</span>'
+      +     (bio.shame ? '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,107,107,.1);color:var(--red);border:1px solid rgba(255,107,107,.2)">' + bio.shame + '</span>' : '')
+      +     (m.paid ? '' : '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,179,71,.1);color:var(--amber);border:1px solid rgba(255,179,71,.2)">⏳ Buy-in pending</span>')
+      +   '</div>'
+      + '</div>'
+      + '</div>';
+  });
+
+  html += '</div>';
+  wrap.innerHTML = html;
 }
 
 // ── SUPABASE INIT ──────────────────────────────────────────────
