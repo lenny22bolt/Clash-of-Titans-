@@ -252,6 +252,7 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
   <button class="nb"     onclick="showTab('power',this)">👑 Power Rankings</button>
   <button class="nb"     onclick="showTab('realmmap',this)">🗺 Realm Map</button>
   <button class="nb"     onclick="showTab('wheel',this)">🎰 Daily Wheel</button>
+  <button class="nb"     onclick="showTab('recap',this)">📜 AI Recap</button>
 </nav>
 
 <div class="main">
@@ -272,6 +273,11 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
   <div class="sec" id="sec-realmmap"><div class="stitle">🗺 The Realm Map</div><div id="realmwrap"></div>  <div class="sec" id="sec-wheel">
     <div class="stitle">🎰 Daily FAAB Wheel</div>
     <div id="wheelwrap"></div>
+  </div>
+
+  <div class="sec" id="sec-recap">
+    <div class="stitle">📜 Weekly AI Recap — The Chronicle</div>
+    <div id="recapwrap"></div>
   </div>
 </div>
 
@@ -2371,6 +2377,7 @@ function spinWheel() {
 
 function renderAll() {
   renderStandings();
+  renderRecap();
   renderRosterBtns();
   renderPicks();
   renderTransactions();
@@ -2449,6 +2456,345 @@ Promise.all([
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
+
+// ── WEEKLY AI RECAP (DEEP MEMORY EDITION) ────────────────────
+
+// ── SEASON MEMORY ─────────────────────────────────────────────
+// Tracks running context across the whole season so the
+// Chronicler can reference history, streaks, and key moves.
+
+var MEMORY_KEY  = 'cot_season_memory';
+var RECAPS_KEY  = 'cot_recaps_v2';
+
+function getMemory() {
+  try { return JSON.parse(localStorage.getItem(MEMORY_KEY) || '{}'); } catch(e) { return {}; }
+}
+function saveMemory(m) { localStorage.setItem(MEMORY_KEY, JSON.stringify(m)); }
+
+function getSavedRecaps() {
+  try { return JSON.parse(localStorage.getItem(RECAPS_KEY) || '[]'); } catch(e) { return []; }
+}
+
+// Update season memory after each recap is generated
+function updateMemory(weekNum, matchups, transactions, notes) {
+  var mem = getMemory();
+  if (!mem.weeks) mem.weeks = {};
+  if (!mem.streaks) mem.streaks = {};
+  if (!mem.keyMoves) mem.keyMoves = [];
+  if (!mem.playerTrends) mem.playerTrends = {};
+
+  // Store weekly snapshot
+  mem.weeks[weekNum] = {
+    matchups: matchups,
+    transactions: transactions,
+    notes: notes,
+    ts: new Date().toISOString()
+  };
+
+  // Track win/loss streaks from matchup results
+  matchups.forEach(function(m) {
+    if (!m.winner || !m.loser) return;
+    var w = m.winner, l = m.loser;
+    if (!mem.streaks[w]) mem.streaks[w] = { streak: 0, type: 'W' };
+    if (!mem.streaks[l]) mem.streaks[l] = { streak: 0, type: 'L' };
+    if (mem.streaks[w].type === 'W') mem.streaks[w].streak++;
+    else { mem.streaks[w] = { streak: 1, type: 'W' }; }
+    if (mem.streaks[l].type === 'L') mem.streaks[l].streak++;
+    else { mem.streaks[l] = { streak: 1, type: 'L' }; }
+  });
+
+  // Store key moves (waivers/trades that were noted)
+  if (transactions && transactions.trim()) {
+    mem.keyMoves.push({ week: weekNum, moves: transactions });
+    mem.keyMoves = mem.keyMoves.slice(-10); // keep last 10 weeks
+  }
+
+  saveMemory(mem);
+}
+
+// Build rich context string for Claude from season memory
+function buildSeasonContext(currentWeek) {
+  var mem = getMemory();
+  var recaps = getSavedRecaps();
+  var ctx = '';
+
+  // Streak summary
+  var streaks = mem.streaks || {};
+  var hotTeams = [], coldTeams = [];
+  Object.keys(streaks).forEach(function(team) {
+    var s = streaks[team];
+    if (s.type === 'W' && s.streak >= 2) hotTeams.push(team + ' (' + s.streak + '-game W streak)');
+    if (s.type === 'L' && s.streak >= 2) coldTeams.push(team + ' (' + s.streak + '-game L streak)');
+  });
+  if (hotTeams.length) ctx += 'HOT STREAKS: ' + hotTeams.join(', ') + '\n';
+  if (coldTeams.length) ctx += 'COLD STREAKS: ' + coldTeams.join(', ') + '\n';
+
+  // Recent key moves (last 4 weeks)
+  var moves = (mem.keyMoves || []).slice(-4);
+  if (moves.length) {
+    ctx += '\nRECENT KEY MOVES & WAIVERS (last 4 weeks):\n';
+    moves.forEach(function(m) {
+      ctx += 'Week ' + m.week + ': ' + m.moves + '\n';
+    });
+  }
+
+  // Last 3 weeks of matchup context
+  var weekNums = Object.keys(mem.weeks || {}).map(Number).sort(function(a,b){return b-a;}).slice(0,3);
+  if (weekNums.length) {
+    ctx += '\nRECENT RESULTS (last 3 weeks):\n';
+    weekNums.forEach(function(wk) {
+      var wkData = mem.weeks[wk];
+      if (wkData && wkData.matchups) {
+        ctx += 'Week ' + wk + ':\n';
+        wkData.matchups.forEach(function(m) {
+          if (m.winner) ctx += '  ' + m.winner + ' (' + m.winScore + ') def. ' + m.loser + ' (' + m.loseScore + ')\n';
+        });
+      }
+    });
+  }
+
+  // Commissioner notes from previous weeks
+  var recentNotes = weekNums.map(function(wk) {
+    var d = mem.weeks[wk];
+    return d && d.notes ? 'Week ' + wk + ' notes: ' + d.notes : null;
+  }).filter(Boolean);
+  if (recentNotes.length) {
+    ctx += '\nCOMMISSIONER CONTEXT:\n' + recentNotes.join('\n') + '\n';
+  }
+
+  return ctx;
+}
+
+// Parse matchup lines from input text into structured objects
+function parseMatchups(text) {
+  var matchups = [];
+  var lines = text.split('\n');
+  lines.forEach(function(line) {
+    // Match patterns like "TeamA 142.3 def. TeamB 98.4" or "TeamA def TeamB 142-98"
+    var m = line.match(/^(.+?)\s+([\d.]+)\s+def\.?\s+(.+?)\s+([\d.]+)/i);
+    if (m) {
+      matchups.push({
+        winner: m[1].trim(),
+        winScore: parseFloat(m[2]),
+        loser: m[3].trim(),
+        loseScore: parseFloat(m[4])
+      });
+    }
+  });
+  return matchups;
+}
+
+var RECAP_SYSTEM = 'You are the official Chronicler of the Clash of Titans fantasy football dynasty league. Write epic, lore-driven weekly recaps that feel like a living history — referencing what happened in prior weeks, which waiver pickups are now paying off, which trades look brilliant or disastrous in hindsight, and which players have been on multi-week tears. The best recaps reference SPECIFIC prior context: "The waiver pickup of X two weeks ago just won this matchup" or "This is the third straight week Y has carried this team." Make it feel like the Chronicler has been watching every snap all season.\n\nLeague: 16-team dynasty, Sleeper, $110 buy-in. Season 2.\nDivisions: Runic North (IceMonkey ❄️, Fenrir\'s Fury 🐺, Warrior Shohei Goatani 🥷, Orion Leaf 🍁) | Celestial South (Hermes Hail Marys 🪽, Wrath of Moctezuma 🔥, Beercules the Destroyer 🍺, Stefanos the Spartan King 🪖) | Ethereal East (Lord of Dreams 🔮, Notchotaur 🐂, Lord Jefita Clapper 🩴, Talon 🪄) | Primordial West (ChatG-TDs 🤖, Dewie Slayer of Bakunawa 🐍, Son of Rander 🌳, Heir of Zeus ⚡)\nS1 champion: IceMonkey. S1 runner-up: ChatG-TDs. S1 third: Lord of Dreams.\n\nFormat rules:\n- Open with a dramatic lore header (📜 Clash of Titans Chronicle – Week X)\n- Recap each matchup as "⚔ Battle I/II/III..." with winner, loser, score, 3-4 sentences, end with a short italicized quote in quotes\n- Reference prior weeks, streaks, waiver moves, and trades whenever the season context shows them\n- 🏆 Top Warrior of the Week — highest scorer, dramatic praise\n- 🪑 Bench of Wonders — best player left on the bench if noted\n- 🏛 Division Standings Update — brief standings for all 4 divisions\n- End with a cliffhanger teaser for next week\n- Total ~700-1000 words. Use emojis. No markdown headers with #. Plain text + emoji only.';
+
+function saveRecap(weekNum, text, rawInput, parsedMatchups, transactions, notes) {
+  var recaps = getSavedRecaps();
+  var existing = recaps.findIndex(function(r){ return r.week === weekNum; });
+  var entry = {
+    week: weekNum,
+    text: text,
+    rawInput: rawInput,
+    matchups: parsedMatchups,
+    transactions: transactions,
+    notes: notes,
+    date: new Date().toISOString()
+  };
+  if (existing > -1) recaps[existing] = entry; else recaps.unshift(entry);
+  localStorage.setItem(RECAPS_KEY, JSON.stringify(recaps.slice(0, 20)));
+
+  // Save to Supabase
+  if (sbReady()) {
+    sbUpsert('manager_notes', {
+      username: 'recap_wk' + weekNum,
+      team_name: 'CHRONICLE',
+      note: text.substring(0, 4000),
+      updated_at: new Date().toISOString()
+    }, 'username');
+  }
+}
+
+// Auto-pull this week's transactions from Sleeper
+function buildSleeperTransactionSummary() {
+  if (!S.transactions || !S.transactions.length) return '';
+  var week = S.week || 1;
+  // Filter to roughly this week (last 7 days)
+  var cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  var recent = S.transactions.filter(function(t) { return t.created * 1000 > cutoff; });
+  if (!recent.length) recent = S.transactions.slice(0, 12);
+
+  var lines = [];
+  recent.slice(0, 15).forEach(function(tx) {
+    var u = S.users.find(function(u){ return u.user_id === tx.creator; }) || {};
+    var team = resolveTeamName(null, u) || u.display_name || 'Unknown';
+    if (tx.type === 'waiver' || tx.type === 'free_agent') {
+      var adds = Object.keys(tx.adds || {}).map(function(pid) {
+        var p = S.players[pid]; return p ? (p.first_name + ' ' + p.last_name + ' (' + p.position + ')') : pid;
+      });
+      var drops = Object.keys(tx.drops || {}).map(function(pid) {
+        var p = S.players[pid]; return p ? (p.first_name + ' ' + p.last_name) : pid;
+      });
+      if (adds.length) lines.push(team + ' added ' + adds.join(', ') + (drops.length ? ' (dropped ' + drops.join(', ') + ')' : '') + (tx.settings && tx.settings.waiver_bid ? ' [$' + tx.settings.waiver_bid + ' FAAB]' : ''));
+    } else if (tx.type === 'trade') {
+      lines.push('TRADE involving ' + team);
+    }
+  });
+  return lines.join('\n');
+}
+
+function renderRecap() {
+  var wrap = document.getElementById('recapwrap');
+  if (!wrap) return;
+  var recaps = getSavedRecaps();
+  var mem = getMemory();
+  var autoTx = buildSleeperTransactionSummary();
+
+  // Streak badges
+  var streakBadges = '';
+  var streaks = mem.streaks || {};
+  var hotTeams = [], coldTeams = [];
+  Object.keys(streaks).forEach(function(team) {
+    var s = streaks[team];
+    if (s.type === 'W' && s.streak >= 2) hotTeams.push('<span style="background:rgba(110,222,126,.15);color:var(--green);border:1px solid rgba(110,222,126,.25);font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px">🔥 '+team+' W'+s.streak+'</span>');
+    if (s.type === 'L' && s.streak >= 2) coldTeams.push('<span style="background:rgba(255,107,107,.12);color:var(--red);border:1px solid rgba(255,107,107,.25);font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px">❄ '+team+' L'+s.streak+'</span>');
+  });
+  if (hotTeams.length || coldTeams.length) {
+    streakBadges = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem">' + hotTeams.concat(coldTeams).join('') + '</div>';
+  }
+
+  var inputSection = '<div style="background:var(--navy-card);border:1px solid var(--gold-border);border-radius:14px;padding:1.5rem;margin-bottom:1.5rem">'
+    + '<div style="font-family:Cinzel Decorative,serif;font-size:16px;color:var(--gold);letter-spacing:2px;margin-bottom:4px;text-align:center">📜 Forge This Week\'s Chronicle</div>'
+    + '<div style="font-size:12px;color:var(--dim);font-family:Cinzel,serif;text-align:center;margin-bottom:1.2rem;line-height:1.7">The Chronicler remembers every prior week. The more context you give, the richer the recap.</div>'
+    + streakBadges
+
+    // Week number
+    + '<div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap">'
+    + '<label style="font-family:Cinzel,serif;font-size:10px;color:var(--gold);letter-spacing:1px">WEEK</label>'
+    + '<input id="recapWeekNum" type="number" min="1" max="18" value="'+(S.week||1)+'" style="width:60px;background:var(--navy-mid);border:1px solid var(--gold-border);border-radius:8px;color:var(--text);font-family:Cinzel,serif;font-size:13px;padding:6px 10px;outline:none">'
+    + '</div>'
+
+    // Scores - main input
+    + '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--gold);letter-spacing:2px;margin-bottom:5px">⚔ MATCHUP SCORES <span style="color:var(--dim);font-size:8px">(format: Team 142.3 def. Team 98.4)</span></div>'
+    + '<textarea id="recapScores" placeholder="IceMonkey 142.3 def. Orion Leaf 98.4\nChatG-TDs 158.6 def. Heir of Zeus 101.2\nHermes Hail Marys 119.2 def. Beercules the Destroyer 88.7\nLord of Dreams 131.0 def. Notchotaur 114.5\n..." style="width:100%;min-height:140px;background:var(--navy-mid);border:1px solid var(--gold-border);border-radius:10px;color:var(--text);font-family:EB Garamond,serif;font-size:14px;padding:12px 14px;resize:vertical;outline:none;line-height:1.7;margin-bottom:12px"></textarea>'
+
+    // Waiver / trades
+    + '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--gold);letter-spacing:2px;margin-bottom:5px">💰 KEY WAIVER ADDS & TRADES THIS WEEK'
+    + (autoTx ? ' <span style="color:var(--green);font-size:8px">(auto-pulled from Sleeper ↓)</span>' : '') + '</div>'
+    + '<textarea id="recapTransactions" style="width:100%;min-height:100px;background:var(--navy-mid);border:1px solid var(--gold-border);border-radius:10px;color:var(--text);font-family:EB Garamond,serif;font-size:13px;padding:12px 14px;resize:vertical;outline:none;line-height:1.7;margin-bottom:12px" placeholder="e.g. IceMonkey added Josh Allen off waivers ($18 FAAB)\nChatG-TDs traded CMC for 2 first-rounders\nHeir of Zeus added Tank Dell ($3 FAAB)">' + autoTx + '</textarea>'
+
+    // Standout plays / commissioner notes
+    + '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--gold);letter-spacing:2px;margin-bottom:5px">🎯 STANDOUT PLAYS & COMMISSIONER NOTES</div>'
+    + '<textarea id="recapNotes" placeholder="Top scorer: Josh Allen 44pts (IceMonkey)\nBench monster: CMC 38pts left on bench by ChatG-TDs\nBiggest upset: Beercules beat Hermes despite benching their QB\nLinup blunder: Orion Leaf started an injured player\nClosest game: Hermes won by 0.4 pts\nKey waiver that paid off: Tank Dell added last week scored 28 for IceMonkey" style="width:100%;min-height:110px;background:var(--navy-mid);border:1px solid var(--gold-border);border-radius:10px;color:var(--text);font-family:EB Garamond,serif;font-size:13px;padding:12px 14px;resize:vertical;outline:none;line-height:1.7;margin-bottom:14px"></textarea>'
+
+    + '<button onclick="generateRecap()" id="recapGenBtn" style="font-family:Cinzel,serif;font-size:12px;font-weight:700;letter-spacing:2px;padding:13px 32px;border-radius:25px;border:2px solid var(--gold);background:var(--gold-dim);color:var(--gold);cursor:pointer;display:block;margin:0 auto;transition:all .2s">⚔ FORGE THE CHRONICLE</button>'
+    + '<div id="recapStatus" style="text-align:center;margin-top:10px;font-family:Cinzel,serif;font-size:11px;color:var(--dim);min-height:20px"></div>'
+    + '</div>';
+
+  // Archive
+  var archiveSection = '';
+  if (recaps.length) {
+    archiveSection = '<div class="stitle" style="margin-top:1.5rem">📚 Chronicle Archive — Season 2</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem">';
+    recaps.forEach(function(r, i) {
+      archiveSection += '<button onclick="showArchivedRecap('+i+')" class="arc-btn" data-idx="'+i+'" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:6px 16px;border-radius:16px;border:1px solid var(--gold-border);background:'+(i===0?'var(--gold-dim)':'transparent')+';color:'+(i===0?'var(--gold)':'var(--dim)')+';cursor:pointer">Week '+r.week+'</button>';
+    });
+    archiveSection += '</div>';
+    archiveSection += '<div id="recapArchiveDisplay">' + formatRecapText(recaps[0].text) + '</div>';
+  }
+
+  wrap.innerHTML = inputSection + archiveSection;
+}
+
+function formatRecapText(text) {
+  if (!text) return '';
+  var lines = text.split('\n');
+  var html = '<div style="background:linear-gradient(135deg,var(--navy-card),var(--navy-mid));border:1px solid var(--gold-border);border-radius:14px;padding:1.5rem 2rem;font-family:EB Garamond,serif;font-size:15px;line-height:1.9;color:var(--text)">';
+  lines.forEach(function(line) {
+    var t = line.trim();
+    if (!t) { html += '<div style="height:8px"></div>'; return; }
+    if (t.match(/^[""\u201c]/)) {
+      html += '<div style="border-left:3px solid var(--gold);padding-left:1rem;margin:10px 0;color:var(--gold);font-style:italic;font-size:14px">'+t+'</div>';
+    } else if (t.match(/^(⚔|📜|🏆|🏛|💀|🪑|👑|🌋|☀|🌿|📈|💬)/u)) {
+      html += '<div style="font-family:Cinzel,serif;font-size:13px;font-weight:700;color:var(--gold);letter-spacing:1px;margin-top:1.4rem;border-bottom:1px solid var(--gold-border);padding-bottom:5px;margin-bottom:6px">'+t+'</div>';
+    } else if (t.match(/Final:|FINAL:|Division:|DIVISION:/i)) {
+      html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);letter-spacing:1px;margin-bottom:3px">'+t+'</div>';
+    } else if (t.match(/^(1️⃣|2️⃣|3️⃣|4️⃣|🥇|🥈|🥉)/u)) {
+      html += '<div style="font-size:13px;padding:3px 0;color:var(--text)">'+t+'</div>';
+    } else {
+      html += '<p style="margin:4px 0">'+t+'</p>';
+    }
+  });
+  html += '</div>';
+  return html;
+}
+
+function showArchivedRecap(idx) {
+  var recaps = getSavedRecaps();
+  if (!recaps[idx]) return;
+  var disp = document.getElementById('recapArchiveDisplay');
+  if (disp) disp.innerHTML = formatRecapText(recaps[idx].text);
+  document.querySelectorAll('.arc-btn').forEach(function(b) {
+    var bi = parseInt(b.dataset.idx);
+    b.style.background = bi === idx ? 'var(--gold-dim)' : 'transparent';
+    b.style.color = bi === idx ? 'var(--gold)' : 'var(--dim)';
+  });
+}
+
+async function generateRecap() {
+  var scores      = (document.getElementById('recapScores')       || {}).value || '';
+  var transactions= (document.getElementById('recapTransactions') || {}).value || '';
+  var notes       = (document.getElementById('recapNotes')        || {}).value || '';
+  var weekNum     = parseInt((document.getElementById('recapWeekNum') || {}).value) || S.week || 1;
+  var btn         = document.getElementById('recapGenBtn');
+  var status      = document.getElementById('recapStatus');
+
+  if (!scores.trim()) {
+    if (status) { status.textContent = '⚠ Paste matchup scores first!'; status.style.color = 'var(--amber)'; }
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ The Chronicler writes...'; }
+  if (status) { status.textContent = 'Summoning the ancient scribes... weaving season memory into the tale...'; status.style.color = 'var(--dim)'; }
+
+  var parsedMatchups = parseMatchups(scores);
+  var seasonCtx = buildSeasonContext(weekNum);
+
+  var userPrompt = 'Write the Week ' + weekNum + ' Clash of Titans Chronicle.\n\n'
+    + '=== THIS WEEK\'S SCORES ===\n' + scores.trim() + '\n\n'
+    + (transactions.trim() ? '=== WAIVER ADDS & TRADES THIS WEEK ===\n' + transactions.trim() + '\n\n' : '')
+    + (notes.trim() ? '=== STANDOUT PLAYS & COMMISSIONER NOTES ===\n' + notes.trim() + '\n\n' : '')
+    + (seasonCtx ? '=== SEASON MEMORY (reference this for depth and continuity) ===\n' + seasonCtx + '\n\n' : '')
+    + 'Write the full Chronicle now. Reference the season memory to add historical depth — mention streaks, prior waiver adds that are now paying off, trades that look good or bad in hindsight. Make it feel like a Chronicler who has watched every snap all season.';
+
+  try {
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1800,
+        system: RECAP_SYSTEM,
+        messages: [{ role: 'user', content: userPrompt }]
+      })
+    });
+
+    var data = await response.json();
+    var text = (data.content && data.content[0] && data.content[0].text) || '';
+    if (!text) throw new Error('No response from Chronicler');
+
+    // Update season memory with this week's data
+    updateMemory(weekNum, parsedMatchups, transactions, notes);
+
+    saveRecap(weekNum, text, scores, parsedMatchups, transactions, notes);
+
+    if (status) { status.textContent = '✅ Chronicle forged! The realm remembers.'; status.style.color = 'var(--green)'; }
+    renderRecap();
+
+  } catch(e) {
+    console.error('Recap generation failed:', e);
+    if (status) { status.textContent = '⚠ The scribes faltered: ' + e.message; status.style.color = 'var(--red)'; }
+    if (btn) { btn.disabled = false; btn.textContent = '⚔ FORGE THE CHRONICLE'; }
+  }
+}
+
 // ── SUPABASE INIT ──────────────────────────────────────────────
 (function() {
   try {
