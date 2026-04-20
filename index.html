@@ -271,7 +271,8 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
     <div id="powerwrap"></div>
   </div>
   <div class="sec" id="sec-quests"><div class="stitle">🗡 Quest Board</div><div id="questswrap"></div></div>
-  <div class="sec" id="sec-realmmap"><div class="stitle">🗺 The Realm Map</div><div id="realmwrap"></div>  <div class="sec" id="sec-wheel">
+  <div class="sec" id="sec-realmmap"><div class="stitle">🗺 The Realm Map</div><div id="realmwrap"></div></div>
+  <div class="sec" id="sec-wheel">
     <div class="stitle">🎰 Daily FAAB Wheel</div>
     <div id="wheelwrap"></div>
   </div>
@@ -2416,12 +2417,11 @@ function safeFetch(path) {
 // ── INIT ──────────────────────────────────────────────────────
 // ── DAILY FAAB WHEEL ─────────────────────────────────────────
 var WHEEL_SLOTS = [
-  {val:1,color:'#C9A84C',weight:40},  // 1 FAAB — most common
-  {val:1,color:'#C9A84C',weight:35},  // 1 FAAB again
-  {val:2,color:'#7BB8E8',weight:14},  // 2 FAAB
-  {val:3,color:'#6EDE7E',weight:7},   // 3 FAAB
-  {val:5,color:'#DD99FF',weight:3},   // 5 FAAB — rare
-  {val:0,color:'#FF6B6B',weight:1},   // 0 FAAB — unlucky
+  {val:1, label:'$1 FAAB',  color:'#C9A84C', glow:'rgba(201,168,76,0.6)',  weight:70}, // 70%
+  {val:2, label:'$2 FAAB',  color:'#7BB8E8', glow:'rgba(123,184,232,0.6)', weight:15}, // 15%
+  {val:0, label:'BROKE',    color:'#FF6B6B', glow:'rgba(255,107,107,0.6)', weight:10}, // 10%
+  {val:3, label:'$3 FAAB',  color:'#6EDE7E', glow:'rgba(110,222,126,0.6)', weight:3},  // 3%
+  {val:5, label:'JACKPOT!', color:'#DD99FF', glow:'rgba(221,153,255,0.6)', weight:2},  // 2%
 ];
 
 // Expand by weight for actual spin
@@ -2434,8 +2434,9 @@ function getLastSpin() { return localStorage.getItem('lastSpin')||''; }
 function setLastSpin(d) { localStorage.setItem('lastSpin', d); }
 
 function canSpinToday() {
-  var today = new Date().toDateString();
-  return getLastSpin() !== today;
+  return true; // Unlimited spins during testing
+  // var today = new Date().toDateString();
+  // return getLastSpin() !== today;
 }
 
 function renderWheel() {
@@ -2443,88 +2444,178 @@ function renderWheel() {
   var history = getWheelHistory();
   var canSpin = canSpinToday();
   var totalFAAB = history.reduce(function(a,h){return a+h.val;}, 0);
+  var total = WHEEL_SLOTS.reduce(function(a,s){return a+s.weight;},0);
 
-  // Build SVG wheel
-  var segments = WHEEL_SLOTS;
-  var total = segments.reduce(function(a,s){return a+s.weight;},0);
-  var cx=200, cy=200, r=170;
+  // ── BUILD GAME-SHOW STYLE WHEEL ──────────────────────────────
+  // Expand slots into many individual segments proportional to weight
+  // 100 total weight = 100 segments, each 3.6 degrees
+  // Use alternating shades per value to create the multi-segment look
+  var COLORS = {
+    1: ['#C9A84C','#E8C060','#B89030','#D4AA50'],  // gold shades
+    2: ['#5599DD','#7BB8E8','#3377BB','#6699CC'],  // blue shades
+    0: ['#CC3333','#FF6B6B','#AA2222','#EE4444'],  // red shades
+    3: ['#44BB66','#6EDE7E','#339955','#55CC77'],  // green shades
+    5: ['#AA55EE','#DD99FF','#8833CC','#CC77FF'],  // purple shades
+  };
+
+  var cx=200, cy=200, r=165, innerR=52;
   var angle = -Math.PI/2;
-  var svgPaths = '';
-  segments.forEach(function(s) {
-    var sweep = (s.weight/total)*2*Math.PI;
-    var x1=cx+r*Math.cos(angle), y1=cy+r*Math.sin(angle);
-    var x2=cx+r*Math.cos(angle+sweep), y2=cy+r*Math.sin(angle+sweep);
-    var lg = sweep>Math.PI?1:0;
-    svgPaths += '<path d="M'+cx+','+cy+' L'+x1.toFixed(1)+','+y1.toFixed(1)+' A'+r+','+r+' 0 '+lg+',1 '+x2.toFixed(1)+','+y2.toFixed(1)+' Z" fill="'+s.color+'" fill-opacity="0.85" stroke="#07111C" stroke-width="2"/>';
-    // Label
-    var midAngle = angle + sweep/2;
-    var lx = cx + (r*0.65)*Math.cos(midAngle);
-    var ly = cy + (r*0.65)*Math.sin(midAngle);
-    svgPaths += '<text x="'+lx.toFixed(1)+'" y="'+(ly+5).toFixed(1)+'" text-anchor="middle" font-family="Cinzel,serif" font-size="18" font-weight="700" fill="#07111C">$'+s.val+'</text>';
-    angle += sweep;
+  var paths = '';
+  var labelData = [];
+  var colorCounters = {0:0,1:0,2:0,3:0,5:0};
+
+  // True interleave — place each value's segments evenly around the wheel
+  // Total = 100 segments. Space them out proportionally.
+  // Strategy: for each position 0-99, pick which value owns it based on probability
+  var interleaved = new Array(100);
+  var placed = {};
+  WHEEL_SLOTS.forEach(function(s){ placed[s.val] = 0; });
+
+  // Assign each slot position to a value based on even spacing
+  for (var pos=0; pos<100; pos++) {
+    // Find which value is most "due" at this position
+    var bestVal = null, bestScore = -1;
+    WHEEL_SLOTS.forEach(function(s) {
+      var expected = (pos+1) * (s.weight/100);
+      var deficit = expected - placed[s.val];
+      if (deficit > bestScore) { bestScore = deficit; bestVal = s.val; }
+    });
+    interleaved[pos] = {val:bestVal};
+    placed[bestVal]++;
+  }
+
+  var sweepPerSeg = (2*Math.PI) / interleaved.length;
+  interleaved.forEach(function(seg, idx) {
+    var cols = COLORS[seg.val] || ['#888'];
+    var col = cols[idx % cols.length];
+    var a1 = angle + idx*sweepPerSeg;
+    var a2 = a1 + sweepPerSeg;
+    var x1=cx+r*Math.cos(a1), y1=cy+r*Math.sin(a1);
+    var x2=cx+r*Math.cos(a2), y2=cy+r*Math.sin(a2);
+    var ix1=cx+innerR*Math.cos(a1), iy1=cy+innerR*Math.sin(a1);
+    var ix2=cx+innerR*Math.cos(a2), iy2=cy+innerR*Math.sin(a2);
+
+    paths += '<path d="M'+ix1.toFixed(2)+','+iy1.toFixed(2)
+           +' L'+x1.toFixed(2)+','+y1.toFixed(2)
+           +' A'+r+','+r+' 0 0,1 '+x2.toFixed(2)+','+y2.toFixed(2)
+           +' L'+ix2.toFixed(2)+','+iy2.toFixed(2)
+           +' A'+innerR+','+innerR+' 0 0,0 '+ix1.toFixed(2)+','+iy1.toFixed(2)+'Z"'
+           +' fill="'+col+'" stroke="#111" stroke-width="0.8"/>';
+
+    // Label — show every nth segment to avoid crowding
+    var labelEvery = Math.ceil(interleaved.length/20);
+    if (idx % labelEvery === 0) {
+      var midAngle = a1 + sweepPerSeg/2;
+      var lr = (r+innerR)/2;
+      var lx = cx + lr*Math.cos(midAngle);
+      var ly = cy + lr*Math.sin(midAngle);
+      var rot = (midAngle*180/Math.PI)+90;
+      var txt = seg.val===0?'BUST':seg.val===5?'$5!':'$'+seg.val;
+      var fs = 9;
+      labelData.push({lx:lx,ly:ly,rot:rot,txt:txt,fs:fs,col:col});
+    }
   });
 
-  var wheelSVG = '<svg id="wheelSVG" viewBox="0 0 400 400" style="width:340px;height:340px;transition:transform 3s cubic-bezier(0.17,0.67,0.12,0.99);display:block;margin:0 auto">'
-    + '<circle cx="200" cy="200" r="175" fill="#07111C" stroke="rgba(201,168,76,0.3)" stroke-width="2"/>'
-    + svgPaths
-    + '<circle cx="200" cy="200" r="40" fill="#07111C" stroke="var(--gold)" stroke-width="2"/>'
-    + '<text x="200" y="195" text-anchor="middle" font-family="Cinzel,serif" font-size="9" fill="var(--gold)" letter-spacing="1">FAAB</text>'
-    + '<text x="200" y="210" text-anchor="middle" font-family="Cinzel,serif" font-size="9" fill="var(--gold)" letter-spacing="1">WHEEL</text>'
-    + '</svg>';
+  // Render labels
+  var labelsSVG = labelData.map(function(l){
+    return '<g transform="translate('+l.lx.toFixed(1)+','+l.ly.toFixed(1)+') rotate('+l.rot.toFixed(1)+')">'
+      + '<text x="0" y="1" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="'+l.fs+'" font-weight="900" fill="rgba(0,0,0,0.5)">'+l.txt+'</text>'
+      + '<text x="0" y="0" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="'+l.fs+'" font-weight="900" fill="#FFF" stroke="#000" stroke-width="0.3">'+l.txt+'</text>'
+      + '</g>';
+  }).join('');
 
-  var pointer = '<div style="text-align:center;margin-bottom:-12px;font-size:28px;position:relative;z-index:2">▼</div>';
+  // ── OUTER GOLD RING ──
+  var outerRing = ''
+    + '<circle cx="200" cy="200" r="175" fill="none" stroke="#5A3E00" stroke-width="14"/>'
+    + '<circle cx="200" cy="200" r="175" fill="none" stroke="#C9A84C" stroke-width="2"/>'
+    + '<circle cx="200" cy="200" r="168" fill="none" stroke="#C9A84C" stroke-width="1" stroke-opacity="0.5"/>'
+    // Bolt dots around ring
+    + [0,15,30,45,60,75,90,105,120,135,150,165,180,195,210,225,240,255,270,285,300,315,330,345].map(function(deg){
+        var rad=deg*Math.PI/180;
+        var bx=200+172*Math.cos(rad), by=200+172*Math.sin(rad);
+        return '<circle cx="'+bx.toFixed(1)+'" cy="'+by.toFixed(1)+'" r="4" fill="#8B6914" stroke="#C9A84C" stroke-width="1"/>';
+      }).join('');
 
+  // ── CENTER HUB ──
+  var hub = ''
+    + '<circle cx="200" cy="200" r="54" fill="#2A1800" stroke="#C9A84C" stroke-width="3"/>'
+    + '<circle cx="200" cy="200" r="48" fill="#1A0D00" stroke="#8B6914" stroke-width="1.5"/>'
+    + '<circle cx="200" cy="200" r="42" fill="#0D0600"/>'
+    // Gold star/compass in center
+    + '<circle cx="200" cy="200" r="16" fill="#C9A84C" stroke="#8B6914" stroke-width="1"/>'
+    + '<circle cx="200" cy="200" r="10" fill="#8B6914"/>'
+    + '<text x="200" y="188" text-anchor="middle" font-family="Cinzel,serif" font-size="8" font-weight="700" fill="#C9A84C" letter-spacing="1">FAAB</text>'
+    + '<text x="200" y="200" text-anchor="middle" font-family="Cinzel,serif" font-size="8" font-weight="700" fill="#C9A84C" letter-spacing="1">WHEEL</text>';
+
+  // Pointer is now outside SVG (fixed position) — not inside rotating element
+  var pointer = '';
+
+  var wheelSVG = '<div style="position:relative;display:inline-block;padding-top:20px">'
+    + '<div style="position:absolute;inset:-16px;border-radius:50%;background:radial-gradient(circle,rgba(201,168,76,0.2) 0%,transparent 65%);pointer-events:none;z-index:0"></div>'
+    + '<svg id="wheelSVG" viewBox="0 0 400 400" style="width:min(360px,92vw);height:min(360px,92vw);display:block;transition:transform 3.5s cubic-bezier(0.17,0.67,0.12,0.99);filter:drop-shadow(0 0 24px rgba(201,168,76,0.5));position:relative;z-index:1">'
+    + '<circle cx="200" cy="200" r="198" fill="#0D0600"/>'
+    + paths + labelsSVG + outerRing + hub
+    + '</svg>'
+    // Pointer OUTSIDE the rotating SVG — fixed at top center, physics flick via JS
+    + '<div id="wheelPointerWrap" style="position:absolute;top:6px;left:50%;transform:translateX(-50%);z-index:10;pointer-events:none;transform-origin:50% 100%;width:28px">'
+    +   '<svg id="wheelPointer" viewBox="0 0 28 44" style="width:28px;height:44px;display:block;transform-origin:14px 40px;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.9))">'
+    +     '<polygon points="14,2 3,38 14,44 25,38" fill="#CC0000" stroke="#880000" stroke-width="1.5"/>'
+    +     '<polygon points="14,4 5,36 14,41 23,36" fill="#FF4444"/>'
+    +     '<polygon points="14,4 9,20 14,24 19,20" fill="#FF6666"/>'
+    +     '<circle cx="14" cy="10" r="5" fill="#FFD700" stroke="#CC9900" stroke-width="1.5"/>'
+    +     '<circle cx="14" cy="10" r="3" fill="#FFF176"/>'
+    +   '</svg>'
+    + '</div>'
+    + '</div>';
+
+  // ── SPIN BUTTON ──
   var spinBtn = canSpin
-    ? '<button id="spinBtn" onclick="spinWheel()" style="font-family:Cinzel,serif;font-size:13px;font-weight:700;letter-spacing:2px;padding:14px 36px;border-radius:30px;border:2px solid var(--gold);background:var(--gold-dim);color:var(--gold);cursor:pointer;transition:all .2s;margin-top:1rem;display:block;margin-left:auto;margin-right:auto">⚡ SPIN FOR TODAY</button>'
-    : '<div style="font-family:Cinzel,serif;font-size:12px;color:var(--dim);text-align:center;margin-top:1rem;letter-spacing:1px">Come back tomorrow for your next spin ⏰</div>';
+    ? '<div style="text-align:center;margin-top:1.2rem">'
+    +   '<button id="spinBtn" onclick="spinWheel()" style="font-family:Cinzel Decorative,serif;font-size:14px;font-weight:700;letter-spacing:2px;padding:15px 44px;border-radius:30px;border:none;background:linear-gradient(135deg,#C9A84C 0%,#FFE066 50%,#C9A84C 100%);color:#0D0600;cursor:pointer;box-shadow:0 4px 24px rgba(201,168,76,0.6),0 2px 8px rgba(0,0,0,0.5);transition:all .2s">SPIN</button>'
+    + '</div>'
+    : '<div style="font-family:Cinzel,serif;font-size:12px;color:var(--dim);text-align:center;margin-top:1.2rem;letter-spacing:1px;padding:12px;background:rgba(0,0,0,.2);border-radius:10px;border:1px solid var(--gold-border)">Come back tomorrow ⏰</div>';
 
-  // History table
+  // ── ODDS ──
+  var oddsHTML = '<div class="stitle">Odds</div><div style="display:flex;flex-direction:column;gap:5px;margin-bottom:1.5rem">';
+  WHEEL_SLOTS.forEach(function(s) {
+    var pct = Math.round((s.weight/total)*100);
+    var col = COLORS[s.val][1];
+    oddsHTML += '<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;background:var(--navy-card);border-radius:8px;border:1px solid rgba(255,255,255,.05)">'
+      + '<div style="width:12px;height:12px;border-radius:3px;background:'+col+';flex-shrink:0"></div>'
+      + '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--text);flex:1">'+s.label+'</div>'
+      + '<div style="font-family:Cinzel,serif;font-size:12px;font-weight:700;color:'+col+'">'+pct+'%</div>'
+      + '<div style="background:rgba(255,255,255,.06);border-radius:4px;height:6px;width:70px;overflow:hidden">'
+      +   '<div style="height:100%;width:'+pct+'%;background:'+col+'"></div>'
+      + '</div></div>';
+  });
+  oddsHTML += '</div>';
+
+  // ── HISTORY ──
   var histHTML = '';
   if (history.length) {
     histHTML = '<div class="stitle" style="margin-top:1.5rem">Spin History</div>'
-      + '<div style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto">';
+      + '<div style="display:flex;flex-direction:column;gap:5px;max-height:220px;overflow-y:auto">';
     history.slice().reverse().forEach(function(h) {
       var col = h.val===5?'#DD99FF':h.val>=3?'#6EDE7E':h.val>=2?'#7BB8E8':h.val===1?'#C9A84C':'#FF6B6B';
-      histHTML += '<div style="display:flex;align-items:center;gap:12px;padding:8px 14px;background:var(--navy-card);border-radius:8px;border:1px solid rgba(255,255,255,.05)">'
-        + '<span style="font-size:18px">🎰</span>'
+      histHTML += '<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;background:var(--navy-card);border-radius:8px;border:1px solid rgba(255,255,255,.04)">'
+        + '<div style="width:8px;height:8px;border-radius:50%;background:'+col+'"></div>'
         + '<div style="flex:1;font-family:Cinzel,serif;font-size:11px;color:var(--text)">'+h.manager+'</div>'
-        + '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--dim)">'+h.date+'</div>'
-        + '<div style="font-family:Cinzel,serif;font-size:16px;font-weight:700;color:'+col+'">+$'+h.val+' FAAB</div>'
+        + '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim)">'+h.date+'</div>'
+        + '<div style="font-family:Cinzel,serif;font-size:13px;font-weight:700;color:'+col+'">'+(h.val===0?'Bust':'+$'+h.val)+' FAAB</div>'
         + '</div>';
     });
     histHTML += '</div>';
   }
 
-  wrap.innerHTML =
-    '<div style="background:var(--navy-card);border:1px solid var(--gold-border);border-radius:12px;padding:14px 18px;margin-bottom:1.5rem;font-family:Cinzel,serif;font-size:11px;color:var(--dim);line-height:1.8;text-align:center">'
-    + '<div style="font-family:Cinzel Decorative,serif;font-size:18px;color:var(--gold);margin-bottom:6px">🎰 Daily FAAB Wheel</div>'
-    + 'Spin once per day for bonus FAAB · Mostly $1 · Rare $3-$5 · <strong style="color:var(--gold)">$'+totalFAAB+' total earned</strong>'
-    + '</div>'
+  var header = '<div style="background:linear-gradient(135deg,#1A0D00,#2A1800);border:1px solid var(--gold-border);border-radius:14px;padding:14px 20px;margin-bottom:1.5rem;text-align:center">'
+    + '<div style="font-family:Cinzel Decorative,serif;font-size:18px;color:var(--gold);letter-spacing:2px;margin-bottom:3px">Daily FAAB Wheel</div>'
+    + '<div style="font-size:12px;color:var(--dim);font-family:Cinzel,serif">Spin once per day · '+(totalFAAB>0?'<strong style="color:var(--gold)">$'+totalFAAB+'</strong> earned by the realm':'No spins yet')+'</div>'
+    + '</div>';
+
+  wrap.innerHTML = header
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;align-items:start">'
-    +   '<div>'
-    +     pointer
-    +     wheelSVG
-    +     spinBtn
-    +   '</div>'
-    +   '<div>'
-    +     '<div class="stitle">Odds</div>'
-    +     '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:1.5rem">'
-    +     WHEEL_SLOTS.map(function(s){
-            var pct = Math.round((s.weight/total)*100);
-            var col = s.val===5?'#DD99FF':s.val>=3?'#6EDE7E':s.val>=2?'#7BB8E8':s.val===1?'#C9A84C':'#FF6B6B';
-            return '<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--navy-card);border-radius:8px;border:1px solid rgba(255,255,255,.05)">'
-              + '<div style="width:14px;height:14px;border-radius:50%;background:'+col+';flex-shrink:0"></div>'
-              + '<div style="font-family:Cinzel,serif;font-size:12px;color:var(--text);flex:1">$'+s.val+' FAAB</div>'
-              + '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--dim)">'+pct+'%</div>'
-              + '<div style="background:rgba(255,255,255,.06);border-radius:4px;height:8px;width:80px;overflow:hidden">'
-              +   '<div style="height:100%;width:'+pct+'%;background:'+col+'"></div>'
-              + '</div>'
-              + '</div>';
-          }).join('')
-    +     '</div>'
-    +     '<div class="stitle">League Leaders</div>'
-    +     buildWheelLeaderboard(history)
-    +   '</div>'
+    + '<div style="text-align:center">'+wheelSVG+spinBtn+'</div>'
+    + '<div>'+oddsHTML+'<div class="stitle">League Leaders</div>'+buildWheelLeaderboard(history)+'</div>'
     + '</div>'
     + histHTML;
 }
@@ -2569,6 +2660,31 @@ function spinWheel() {
     wheel.style.transform='rotate('+finalAngle+'deg)';
   }
 
+  // Pointer physics — flicks rapidly then settles as wheel slows
+  var pointer = document.getElementById('wheelPointer');
+  if (pointer) {
+    var flickDuration = 3500; // match wheel spin duration
+    var startTime = null;
+    var maxFlick = 28; // max degrees of flick
+    function animPointer(ts) {
+      if (!startTime) startTime = ts;
+      var elapsed = ts - startTime;
+      var progress = Math.min(elapsed / flickDuration, 1);
+      // Ease out — fast flicks early, settling near end
+      var speed = 1 - progress; // 1 at start, 0 at end
+      var flickFreq = 0.04 + speed * 0.18; // frequency slows down
+      var flickAmp = maxFlick * speed * speed; // amplitude decreases
+      var angle = Math.sin(elapsed * flickFreq) * flickAmp;
+      pointer.style.transform = 'rotate(' + angle.toFixed(1) + 'deg)';
+      if (progress < 1) {
+        requestAnimationFrame(animPointer);
+      } else {
+        pointer.style.transform = 'rotate(0deg)'; // settle perfectly upright
+      }
+    }
+    requestAnimationFrame(animPointer);
+  }
+
   setTimeout(async function() {
     // Ask which manager is spinning
     var manager = prompt('Which manager is spinning? (Enter your team name)', 'Your team name');
@@ -2579,7 +2695,7 @@ function spinWheel() {
     var history = getWheelHistory();
     history.push({ manager:manager, val:result.val, date:today });
     saveWheelHistory(history);
-    setLastSpin(today);
+    // setLastSpin(today); // Disabled during testing — re-enable for production
 
     // Find username from team name
     var mgr = MANAGERS.find(function(m){ return m.name === manager; });
