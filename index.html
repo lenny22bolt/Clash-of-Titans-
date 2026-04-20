@@ -176,6 +176,7 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
 .realm-tooltip.show{opacity:1}
 .qfbtn{font-family:'Cinzel',serif;font-size:9px;font-weight:700;letter-spacing:1.5px;padding:5px 14px;border-radius:20px;border:1px solid var(--gold-border);background:transparent;color:var(--dim);cursor:pointer;transition:all .15s}
 .qfbtn:hover,.qfbtn.on{background:var(--gold-dim);color:var(--gold);border-color:var(--gold)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-track{background:var(--navy)}
 ::-webkit-scrollbar-thumb{background:#8B6914;border-radius:4px}
@@ -1517,7 +1518,7 @@ async function sbUpsert(table, data, conflict) {
 }
 
 // ── TREASURY LOCAL FALLBACK ────────────────────────────────────
-function getTreasury() { return parseFloat(localStorage.getItem('treasury')||'160'); }
+function getTreasury() { return parseFloat(localStorage.getItem('treasury')||'228.60'); }
 function setTreasuryLocal(v) { localStorage.setItem('treasury', v); }
 
 // Sync paid status from Supabase into MANAGERS array
@@ -1547,14 +1548,16 @@ function renderTreasury() {
     : '<span style="font-size:9px;color:var(--amber);font-family:Cinzel,serif;letter-spacing:1px">○ LOCAL</span>';
 
   var html = '<div class="treasury-hero">'
-    + '<div style="font-family:Cinzel Decorative,serif;font-size:14px;color:var(--gold);letter-spacing:3px;margin-bottom:.5rem">⚔ TITAN TREASURY ⚔</div>'
-    + '<div class="treasury-amount">$'+amt.toFixed(2)+'</div>'
-    + '<div style="font-size:12px;color:var(--dim);margin-top:8px;font-family:Cinzel,serif;letter-spacing:1px">Held on Kraken · $110/manager buy-in · Season 2<br>'
-    + '<strong style="color:var(--gold)">'+paid+'/16</strong> tributes paid'+(pending ? ' · <strong style="color:var(--amber)">'+pending+' pending</strong>' : ' · <strong style="color:var(--green)">All paid!</strong>')+'&nbsp;&nbsp;'+syncIndicator+'</div>'
-    + '<div style="display:flex;gap:10px;justify-content:center;margin-top:1rem;flex-wrap:wrap">'
-    + '<button onclick="updateTreasury()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:8px 20px;border-radius:20px;border:1px solid var(--gold-border);background:transparent;color:var(--gold);cursor:pointer">✏ Update Balance</button>'
-    + '<a href="https://www.kraken.com/u/AA63N84GWGPCA4UY" target="_blank" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:8px 20px;border-radius:20px;border:1px solid rgba(123,184,232,.3);color:var(--blue);text-decoration:none">🔗 View on Kraken</a>'
-    + '</div></div>';
+    // Crypto pot header
+    + '<div style="font-family:Cinzel Decorative,serif;font-size:11px;color:var(--dim);letter-spacing:3px;margin-bottom:.3rem;text-transform:uppercase">⚡ Titan Treasury — Crypto Pot</div>'
+    + '<div class="treasury-amount" style="font-size:58px;cursor:default" id="cryptoAmt" onclick="commishTap()" title="">$'+amt.toFixed(2)+'</div>'
+    + '<div style="font-size:11px;color:var(--dim);margin-top:6px;font-family:Cinzel,serif;letter-spacing:1px">Held on Kraken · Growing every season · Never sold &nbsp;&nbsp;'+syncIndicator+'</div>'
+    // Kraken badge
+    + '<div style="display:inline-flex;align-items:center;gap:8px;margin-top:10px;background:rgba(123,184,232,.08);border:1px solid rgba(123,184,232,.2);border-radius:20px;padding:5px 16px">'
+    +   '<div style="width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite"></div>'
+    +   '<span style="font-family:Cinzel,serif;font-size:10px;color:var(--blue);letter-spacing:1px">LIVE ON KRAKEN</span>'
+    + '</div>'
+    + '</div>';
 
   // ── PRIZE BREAKDOWN ──
   html += '<div class="stitle" style="margin-top:1.5rem">🏆 Season 2 Prize Pool</div>';
@@ -1625,14 +1628,19 @@ function renderTreasury() {
 
   // ── RULES ──
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">'
-    + '<div class="tr-card"><div class="tr-card-title">Treasury Rules</div>'
-    + '<div style="font-size:13px;color:var(--text);line-height:1.8">$110 buy-in per season<br>🥇 Champion: $900<br>🥈 Runner-Up: $300<br>🥉 Third: $120<br>👑 Weekly Warrior: $20/wk (Wks 1–14)<br>🏆 S1 Champion: IceMonkey</div></div>'
-    + '<div class="tr-card"><div class="tr-card-title">S2 Breakdown</div>'
-    + '<div style="font-size:13px;color:var(--text);line-height:1.8">16 × $110 = <strong style="color:var(--gold)">$1,760</strong><br>Weekly Warriors: <strong style="color:var(--gold)">$280</strong> (14 wks)<br>Prizes paid out: <strong style="color:var(--gold)">$1,320</strong><br>Rolls to S3: ~$440<br>5-season pot: <strong style="color:var(--gold)">$8,800+</strong></div></div>'
+    + '<div class="tr-card"><div class="tr-card-title">Crypto Pot Rules</div>'
+    + '<div style="font-size:13px;color:var(--text);line-height:1.8">Each season $10/manager goes into crypto<br>Held on Kraken · Never cashed out<br>Grows with every season played<br>S1 deposited: <strong style="color:var(--gold)">$160</strong><br>S2 deposited: <strong style="color:var(--gold)">$160</strong><br>Current pot: <strong style="color:var(--gold)">$228.60</strong> (incl. gains)</div></div>'
+    + '<div class="tr-card"><div class="tr-card-title">Season 2 Payouts</div>'
+    + '<div style="font-size:13px;color:var(--text);line-height:1.8">Buy-in: $110/manager<br>🥇 Champion: <strong style="color:var(--gold)">$900</strong><br>🥈 Runner-Up: <strong style="color:var(--gold)">$300</strong><br>🥉 Third: <strong style="color:var(--gold)">$120</strong><br>👑 Weekly Warrior: <strong style="color:var(--gold)">$20</strong>/wk (Wks 1–14)<br>🏆 S1 Champ: IceMonkey</div></div>'
     + '</div>';
 
   // ── TRIBUTE STATUS ──
-  html += '<div class="stitle">Season 2 Tribute Status</div>';
+  html += '<div style="background:rgba(201,168,76,.06);border:1px solid var(--gold-border);border-radius:12px;padding:12px 16px;margin-bottom:1rem;display:flex;align-items:center;gap:12px">'
+    + '<div style="flex:1"><div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:var(--gold)">Season 2 Buy-In Status</div>'
+    + '<div style="font-size:11px;color:var(--dim);font-family:Cinzel,serif;margin-top:2px">$110/manager · <strong style="color:var(--gold)">'+paid+'/16</strong> paid'+(pending?' · <strong style="color:var(--amber)">'+pending+' pending</strong>':' · <strong style="color:var(--green)">All in!</strong>')+'</div></div>'
+    + '<div style="text-align:right"><div style="font-family:Cinzel,serif;font-size:20px;font-weight:700;color:var(--gold)">$'+(paid*110).toLocaleString()+'</div>'
+    + '<div style="font-size:9px;color:var(--dim);font-family:Cinzel,serif;letter-spacing:1px">COLLECTED</div></div>'
+    + '</div>';
   var sorted = MANAGERS.slice().sort(function(a,b){ return (b.paid?1:0)-(a.paid?1:0); });
   sorted.forEach(function(m) {
     html += '<div class="contrib-row" style="cursor:pointer" onclick="togglePaid(this)" data-un="'+m.username+'" data-tn="'+m.name+'">'  
@@ -1642,7 +1650,7 @@ function renderTreasury() {
       + '<span class="'+(m.paid?'cs-paid':'cs-pending')+'">'+(m.paid?'✓ Paid':'⏳ Pending')+'</span>'
       + '</div>';
   });
-  html += '<div style="margin-top:12px;font-size:10px;color:var(--dim);font-family:Cinzel,serif;text-align:center;font-style:italic">Commissioner: tap any row to toggle paid status</div>';
+  html += '<div style="margin-top:12px;font-size:10px;color:var(--dim);font-family:Cinzel,serif;text-align:center;font-style:italic">Tap any row to update tribute status</div>';
   wrap.innerHTML = html;
 }
 
@@ -1685,14 +1693,24 @@ async function togglePaid(el) {
   }, 'username');
 }
 
+var _commishTaps = 0, _commishTimer = null;
+function commishTap() {
+  _commishTaps++;
+  clearTimeout(_commishTimer);
+  _commishTimer = setTimeout(function(){ _commishTaps = 0; }, 2000);
+  if (_commishTaps >= 5) {
+    _commishTaps = 0;
+    updateTreasury();
+  }
+}
+
 async function updateTreasury() {
-  var v = prompt('Update Treasury balance ($):', getTreasury().toFixed(2));
+  var v = prompt('Commissioner: Update Crypto Pot balance ($):', getTreasury().toFixed(2));
   if (v === null) return;
   var n = parseFloat(v);
   if (!isNaN(n) && n >= 0) {
     setTreasuryLocal(n);
     renderTreasury();
-    // Sync balance to Supabase under commissioner account
     await sbUpsert('treasury', {
       username: 'lennylee22',
       team_name: 'Heir of Zeus',
