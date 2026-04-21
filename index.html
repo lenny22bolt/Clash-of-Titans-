@@ -2536,16 +2536,18 @@ function renderWheel() {
         return '<circle cx="'+bx.toFixed(1)+'" cy="'+by.toFixed(1)+'" r="4" fill="#8B6914" stroke="#C9A84C" stroke-width="1"/>';
       }).join('');
 
-  // ── CENTER HUB ──
+  // ── CENTER HUB — COT Logo ──
+  // Get the logo src from the hero image already in the page
+  var logoEl = document.getElementById('heroLogo');
+  var logoSrc = logoEl ? logoEl.src : '';
   var hub = ''
-    + '<circle cx="200" cy="200" r="54" fill="#2A1800" stroke="#C9A84C" stroke-width="3"/>'
-    + '<circle cx="200" cy="200" r="48" fill="#1A0D00" stroke="#8B6914" stroke-width="1.5"/>'
-    + '<circle cx="200" cy="200" r="42" fill="#0D0600"/>'
-    // Gold star/compass in center
-    + '<circle cx="200" cy="200" r="16" fill="#C9A84C" stroke="#8B6914" stroke-width="1"/>'
-    + '<circle cx="200" cy="200" r="10" fill="#8B6914"/>'
-    + '<text x="200" y="188" text-anchor="middle" font-family="Cinzel,serif" font-size="8" font-weight="700" fill="#C9A84C" letter-spacing="1">FAAB</text>'
-    + '<text x="200" y="200" text-anchor="middle" font-family="Cinzel,serif" font-size="8" font-weight="700" fill="#C9A84C" letter-spacing="1">WHEEL</text>';
+    + '<circle cx="200" cy="200" r="58" fill="#1A0D00" stroke="#C9A84C" stroke-width="3"/>'
+    + '<circle cx="200" cy="200" r="52" fill="#0D0600" stroke="#8B6914" stroke-width="1"/>'
+    + (logoSrc
+        ? '<image href="'+logoSrc+'" x="148" y="148" width="104" height="104" clip-path="url(#hubClip)"/>'
+          + '<defs><clipPath id="hubClip"><circle cx="200" cy="200" r="50"/></clipPath></defs>'
+        : '<text x="200" y="195" text-anchor="middle" font-family="Cinzel,serif" font-size="9" font-weight="700" fill="#C9A84C" letter-spacing="1">COT</text>')
+    + '<circle cx="200" cy="200" r="58" fill="none" stroke="#C9A84C" stroke-width="2"/>';
 
   // Pointer is now outside SVG (fixed position) — not inside rotating element
   var pointer = '';
@@ -2558,12 +2560,12 @@ function renderWheel() {
     + '</svg>'
     // Pointer OUTSIDE the rotating SVG — fixed at top center, physics flick via JS
     + '<div id="wheelPointerWrap" style="position:absolute;top:6px;left:50%;transform:translateX(-50%);z-index:10;pointer-events:none;transform-origin:50% 100%;width:28px">'
-    +   '<svg id="wheelPointer" viewBox="0 0 28 44" style="width:28px;height:44px;display:block;transform-origin:14px 40px;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.9))">'
-    +     '<polygon points="14,2 3,38 14,44 25,38" fill="#CC0000" stroke="#880000" stroke-width="1.5"/>'
-    +     '<polygon points="14,4 5,36 14,41 23,36" fill="#FF4444"/>'
-    +     '<polygon points="14,4 9,20 14,24 19,20" fill="#FF6666"/>'
-    +     '<circle cx="14" cy="10" r="5" fill="#FFD700" stroke="#CC9900" stroke-width="1.5"/>'
-    +     '<circle cx="14" cy="10" r="3" fill="#FFF176"/>'
+    +   '<svg id="wheelPointer" viewBox="0 0 28 44" style="width:28px;height:44px;display:block;transform-origin:14px 4px;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.9))">'
+    +     '<polygon points="14,44 3,8 14,2 25,8" fill="#CC0000" stroke="#880000" stroke-width="1.5"/>'
+    +     '<polygon points="14,42 5,9 14,4 23,9" fill="#FF4444"/>'
+    +     '<polygon points="14,42 9,26 14,22 19,26" fill="#FF6666"/>'
+    +     '<circle cx="14" cy="36" r="5" fill="#FFD700" stroke="#CC9900" stroke-width="1.5"/>'
+    +     '<circle cx="14" cy="36" r="3" fill="#FFF176"/>'
     +   '</svg>'
     + '</div>'
     + '</div>';
