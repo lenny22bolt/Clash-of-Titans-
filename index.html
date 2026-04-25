@@ -2200,9 +2200,9 @@ function renderRealmMap() {
   html += '<div id="hexLayer" style="position:absolute;inset:0;z-index:3;transition:opacity .4s;opacity:'+(hexVisible?'1':'0')+';pointer-events:'+(hexVisible?'all':'none')+'">' + buildHexSVG(hexOwnership, activeDivision) + '</div>';
   // Subtle dark overlay
   html += '<div style="position:absolute;inset:0;background:rgba(5,13,21,0.03);pointer-events:none;z-index:2"></div>';
-  // Toggle button
-  html += '<div onclick="toggleHexLayer()" style="position:absolute;top:8px;right:8px;z-index:10;cursor:pointer;background:rgba(5,13,21,0.75);border:1px solid var(--gold-border);border-radius:20px;padding:5px 12px;font-family:Cinzel,serif;font-size:9px;color:var(--gold);letter-spacing:1px;backdrop-filter:blur(4px)">'
-    + (hexVisible ? '⚔ Territory ON' : '🗺 Territory OFF') + '</div>';
+  // Toggle button moved to legend bar below map
+
+
 
   // ── TEAM NODES ──
   // S1 overall podium — always get extra halo regardless of S2 standing
@@ -2281,11 +2281,11 @@ function renderRealmMap() {
   // ── LEGEND ──
   html += '<div style="display:flex;gap:1rem;flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--gold-border);align-items:center;background:rgba(0,0,0,.3)">'
     + '<span style="font-family:Cinzel,serif;font-size:9px;color:#7BB8E8">⚔ Runic North</span>'
-    + '<span style="font-family:Cinzel,serif;font-size:9px;color:#FFB347">☀ Celestial South</span>'
+    + '<span style="font-family:Cinzel,serif;font-size:9px;color:#FFD580">☀ Celestial South</span>'
     + '<span style="font-family:Cinzel,serif;font-size:9px;color:#6EDE7E">🌿 Ethereal East</span>'
     + '<span style="font-family:Cinzel,serif;font-size:9px;color:#FF6B6B">🌋 Primordial West</span>'
-    + '<span style="font-size:9px;color:var(--dim)">🥇 1st · 🥈 2nd · 🥉 3rd in division</span>'
-    + '<span style="font-family:Cinzel,serif;font-size:9px;color:var(--gold);margin-left:auto">Tap nodes for stats</span>'
+    + '<span style="margin-left:auto"><button onclick="toggleHexLayer()" style="font-family:Cinzel,serif;font-size:9px;font-weight:700;letter-spacing:1px;padding:4px 12px;border-radius:16px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer">'+(hexVisible?'⚔ Territory ON':'🗺 Territory OFF')+'</button></span>'
+    + ''
     + '</div>';
 
   html += '</div>'; // end outer
@@ -2682,6 +2682,8 @@ function showTab(tab, btn) {
   document.querySelectorAll('.nb').forEach(function(b){b.classList.remove('on');});
   document.getElementById('sec-'+tab).classList.add('on');
   if (btn) btn.classList.add('on');
+  // Re-render wheel fresh each time tab is opened so spin state reflects current manager
+  if (tab === 'wheel') setTimeout(renderWheel, 50);
 }
 
 // ── API ───────────────────────────────────────────────────────
@@ -2710,15 +2712,47 @@ var WHEEL_SLOTS = [
 var WHEEL_EXPANDED = [];
 WHEEL_SLOTS.forEach(function(s){ for(var i=0;i<s.weight;i++) WHEEL_EXPANDED.push(s); });
 
-function getWheelHistory() { try { return JSON.parse(localStorage.getItem('wheelHistory')||'[]'); } catch(e){ return []; } }
+function getWheelHistory() {
+  try {
+    // Version check — clear old history that had no manager tracking
+    var v = localStorage.getItem('wheelHistoryVersion');
+    if (v !== '3') { localStorage.removeItem('wheelHistory'); localStorage.removeItem('spinDates'); localStorage.setItem('wheelHistoryVersion','3'); }
+    return JSON.parse(localStorage.getItem('wheelHistory')||'[]');
+  } catch(e){ return []; }
+}
 function saveWheelHistory(h) { localStorage.setItem('wheelHistory', JSON.stringify(h.slice(-30))); }
 function getLastSpin() { return localStorage.getItem('lastSpin')||''; }
 function setLastSpin(d) { localStorage.setItem('lastSpin', d); }
 
+function getSpinDates() { try { return JSON.parse(localStorage.getItem('spinDates')||'{}'); } catch(e){ return {}; } }
+function recordSpinDate(teamName) {
+  var dates = getSpinDates();
+  dates[teamName] = new Date().toDateString();
+  localStorage.setItem('spinDates', JSON.stringify(dates));
+}
+function resetWheelData() {
+  if (!confirm('Reset ALL wheel history and leaderboard? This cannot be undone.')) return;
+  localStorage.removeItem('wheelHistory');
+  localStorage.removeItem('spinDates');
+  localStorage.removeItem('wheelHistoryVersion');
+  // Also clear Supabase wheel_spins if connected
+  if (sbReady()) {
+    SB.from('wheel_spins').delete().neq('id', 0).then(function() {
+      console.log('Supabase wheel_spins cleared');
+    });
+  }
+  renderWheel();
+  alert('Wheel history and leaderboard reset ✓');
+}
+
 function canSpinToday() {
-  return true; // Unlimited spins during testing
-  // var today = new Date().toDateString();
-  // return getLastSpin() !== today;
+  var mgr = getCurrentManager();
+  if (!mgr) return false; // must be signed in
+  var today = new Date().toDateString();
+  var dates = getSpinDates();
+  var lastSpin = dates[mgr.name];
+  // Only blocked if THIS specific manager spun today
+  return lastSpin !== today;
 }
 
 function renderWheel() {
@@ -2994,7 +3028,7 @@ function spinWheel() {
     var history = getWheelHistory();
     history.push({ manager:manager, val:result.val, date:today });
     saveWheelHistory(history);
-    // setLastSpin(today); // Disabled during testing — re-enable for production
+    recordSpinDate(manager); // Track spin per manager separately from history
 
     // Find username from team name
     var mgr = MANAGERS.find(function(m){ return m.name === manager; });
@@ -3192,7 +3226,13 @@ function signinSelect(btn){selectManager(btn.getAttribute('data-team'));}
 function selectManager(name) {
   var m = MANAGERS.find(function(x){return x.name===name;});
   if (!m) return;
-  saveManager(m); updateSignInHeader(); closeSignIn(); showEpicLoading(m);
+  saveManager(m);
+  updateSignInHeader();
+  closeSignIn();
+  showEpicLoading(m);
+  // If wheel tab is visible, re-render it for the new manager
+  var wheelSec = document.getElementById('sec-wheel');
+  if (wheelSec && wheelSec.classList.contains('on')) setTimeout(renderWheel, 50);
 }
 function closeSignIn(){document.getElementById('signinOverlay').style.display='none';}
 function signOut(){localStorage.removeItem('cotManager');updateSignInHeader();}
