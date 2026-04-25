@@ -293,7 +293,7 @@ var PIMG = 'https://sleepercdn.com/content/nfl/players/thumb/';
 
 var DIVMAP = {
   1:{name:'Runic North',    icon:'⚔', color:'#7BB8E8', crest:'crest-north.png'},
-  2:{name:'Celestial South',icon:'☀', color:'#FFB347', crest:'crest-south.png'},
+  2:{name:'Celestial South',icon:'☀', color:'#FFD580', crest:'crest-south.png'},
   3:{name:'Ethereal East',  icon:'🌿',color:'#6EDE7E', crest:'crest-east.png'},
   4:{name:'Primordial West',icon:'🌋',color:'#FF6B6B', crest:'crest-west.png'}
 };
@@ -1936,8 +1936,8 @@ function buildHexSVG(ownership, activeDiv) {
     var emoji = owner ? (TEAM_EMOJIS[owner] || '') : (isCenter ? '⚔️' : '');
     
     // Check if this hex belongs to the active division
-    var divMap = {1:'north', 2:'east', 3:'west', 4:'south'};
-    var hexDivId = {north:1, east:2, west:3, south:4, center:0}[h.div];
+    var divMap = {1:'north', 2:'south', 3:'east', 4:'west'};
+    var hexDivId = {north:1, south:2, east:3, west:4, center:0}[h.div];
     var isActiveDivHex = activeDiv && hexDivId === activeDiv;
     
     // Build hex polygon points
@@ -3165,8 +3165,8 @@ function openSignIn() {
     var safe = m.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
     html += '<button onclick="signinSelect(this)" data-team="'+safe+'" style="background:'+(isMe?'rgba(201,168,76,.15)':'rgba(255,255,255,.03)')
       +';border:2px solid '+(isMe?dc:'rgba(255,255,255,.08)')
-      +';border-radius:12px;padding:6px;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative">'
-      +'<img src="'+BASE_IMG_SI+(m.crest||DIV_CRESTS[div]||'crest-north.png')+'" style="width:110px;height:110px;object-fit:contain;border-radius:8px;display:block" onerror="this.src=&quot;https://lenny22bolt.github.io/Clash-of-Titans-/icon-512.png&quot;">'
+      +';border-radius:12px;padding:4px;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:3px;position:relative">'
+      +'<img src="'+BASE_IMG_SI+(m.crest||DIV_CRESTS[div]||'crest-north.png')+'" style="width:clamp(70px,18vw,110px);height:clamp(70px,18vw,110px);object-fit:contain;border-radius:8px;display:block" onerror="this.src=&quot;https://lenny22bolt.github.io/Clash-of-Titans-/icon-512.png&quot;">'
       +(isMe?'<div style="position:absolute;top:4px;right:6px;font-size:9px;color:'+dc+';font-weight:700">&#10003;</div>':'')
 
       +'</button>';
@@ -3744,21 +3744,21 @@ if ('serviceWorker' in navigator) {
 </script>
 
 <div id="signinOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center">
-  <div style="background:linear-gradient(135deg,#0A1628,#132040);border:1px solid var(--gold-border);border-radius:20px;padding:28px 24px;max-width:680px;width:95%;box-shadow:0 0 60px rgba(201,168,76,.2)">
-    <div style="text-align:center;margin-bottom:20px">
-      <div style="font-family:Cinzel,serif;font-size:16px;font-weight:700;color:var(--gold);letter-spacing:2px">&#9876; Choose Your Titan</div>
+  <div style="background:linear-gradient(135deg,#0A1628,#132040);border:1px solid var(--gold-border);border-radius:20px;padding:20px 16px;max-width:680px;width:95%;max-height:92vh;overflow-y:auto;box-shadow:0 0 60px rgba(201,168,76,.2)">
+    <div style="text-align:center;margin-bottom:12px">
+      <div style="font-family:Cinzel,serif;font-size:clamp(13px,4vw,16px);font-weight:700;color:var(--gold);letter-spacing:2px">&#9876; Choose Your Titan</div>
       <div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-top:4px;letter-spacing:1px">Who rules your destiny?</div>
     </div>
-    <div id="signinGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px"></div>
+    <div id="signinGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px"></div>
     <div style="text-align:center"><button onclick="closeSignIn()" style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);background:none;border:none;cursor:pointer;letter-spacing:1px">&#10005; Maybe Later</button></div>
   </div>
 </div>
 
 <div id="cotLoadingScreen" style="display:none;position:fixed;inset:0;z-index:99999;overflow:hidden;background:#07111C">
   <!-- Epic background image with slow zoom -->
-  <div style="position:absolute;inset:0;z-index:0;overflow:hidden">
+  <div style="position:absolute;inset:0;z-index:0;overflow:hidden;background:#07111C">
     <picture>
-      <source srcset="https://lenny22bolt.github.io/Clash-of-Titans-/loading-bg.webp" type="image/webp">
+      <source srcset="https://lenny22bolt.github.io/Clash-of-Titans-/loading-bg.jpg" type="image/webp">
       <img src="https://lenny22bolt.github.io/Clash-of-Titans-/loading-bg.jpg"
            style="width:100%;height:100%;object-fit:cover;transform-origin:center center;animation:epicZoom 4s ease-in-out infinite alternate;image-rendering:high-quality;-webkit-backface-visibility:hidden;backface-visibility:hidden"
            onerror="this.parentElement.parentElement.style.background='#07111C'">
@@ -3768,7 +3768,10 @@ if ('serviceWorker' in navigator) {
   <div style="position:absolute;inset:0;background:radial-gradient(ellipse at center, rgba(7,17,28,0.15) 0%, rgba(7,17,28,0.6) 100%);z-index:1"></div>
   <canvas id="loadCanvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2"></canvas>
   <style>
-    @keyframes epicZoom {
+    @media (max-width: 500px) {
+  #signinGrid { grid-template-columns: repeat(2, 1fr) !important; }
+}
+@keyframes epicZoom {
       from { transform: scale(1.0); }
       to   { transform: scale(1.08); }
     }
