@@ -2724,7 +2724,8 @@ function canSpinToday() {
 function renderWheel() {
   var wrap = document.getElementById('wheelwrap');
   var history = getWheelHistory();
-  var canSpin = canSpinToday();
+  var signedIn = getCurrentManager();
+  var canSpin = canSpinToday() && !!signedIn;
   var totalFAAB = history.reduce(function(a,h){return a+h.val;}, 0);
   var total = WHEEL_SLOTS.reduce(function(a,s){return a+s.weight;},0);
 
@@ -2905,16 +2906,23 @@ function renderWheel() {
 }
 
 function buildWheelLeaderboard(history) {
+  var BASE = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
   var totals = {};
   history.forEach(function(h){ totals[h.manager]=(totals[h.manager]||0)+h.val; });
-  var sorted = Object.keys(totals).map(function(k){return {name:k,total:totals[k]};}).sort(function(a,b){return b.total-a.total;}).slice(0,5);
+  var sorted = Object.keys(totals).map(function(k){return {name:k,total:totals[k]};}).sort(function(a,b){return b.total-a.total;}).slice(0,8);
   if (!sorted.length) return '<div style="font-size:12px;color:var(--dim);font-family:Cinzel,serif;font-style:italic">No spins yet. Be the first!</div>';
+  var me = getCurrentManager();
   var html = '<div style="display:flex;flex-direction:column;gap:5px">';
   sorted.forEach(function(m,i){
-    var medals=['🥇','🥈','🥉','4.','5.'];
-    html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 12px;background:var(--navy-card);border-radius:8px">'
-      + '<span style="font-size:16px">'+medals[i]+'</span>'
-      + '<div style="flex:1;font-family:Cinzel,serif;font-size:10px;color:var(--text)">'+m.name+'</div>'
+    var medals=['🥇','🥈','🥉','4.','5.','6.','7.','8.'];
+    var mgr = MANAGERS.find(function(x){return x.name===m.name;});
+    var isMe = me && me.name === m.name;
+    var crest = mgr && mgr.crest
+      ? '<img src="'+BASE+mgr.crest+'" style="width:26px;height:26px;object-fit:contain;border-radius:4px" onerror="this.style.display=\'none\'">'
+      : '<span style="font-size:14px">'+medals[i]+'</span>';
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:'+(isMe?'rgba(201,168,76,.1)':'var(--navy-card)')+';border-radius:8px;border:1px solid '+(isMe?'rgba(201,168,76,.3)':'transparent')+'">'
+      + crest
+      + '<div style="flex:1;font-family:Cinzel,serif;font-size:10px;color:'+(isMe?'var(--gold)':'var(--text)')+';font-weight:'+(isMe?'700':'400')+'">'+m.name+(isMe?' ✦':'')+'</div>'
       + '<div style="font-family:Cinzel,serif;font-size:13px;font-weight:700;color:var(--gold)">$'+m.total+'</div>'
       + '</div>';
   });
@@ -2970,9 +2978,16 @@ function spinWheel() {
   }
 
   setTimeout(async function() {
-    // Ask which manager is spinning
-    var manager = prompt('Which manager is spinning? (Enter your team name)', 'Your team name');
-    if (!manager) manager = 'Unknown Manager';
+    // Get signed-in manager
+    var signedIn = getCurrentManager();
+    var manager = signedIn ? signedIn.name : null;
+    if (!manager) {
+      // Not signed in — prompt them to sign in first
+      if (confirm('Sign in first to track your spins!\n\nOpen the Sign In screen?')) {
+        openSignIn();
+      }
+      return;
+    }
 
     var today = new Date().toDateString();
     var todayISO = new Date().toISOString().split('T')[0];
