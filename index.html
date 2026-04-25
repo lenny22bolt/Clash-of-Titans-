@@ -3757,9 +3757,12 @@ if ('serviceWorker' in navigator) {
 <div id="cotLoadingScreen" style="display:none;position:fixed;inset:0;z-index:99999;overflow:hidden;background:#07111C">
   <!-- Epic background image with slow zoom -->
   <div style="position:absolute;inset:0;z-index:0;overflow:hidden">
-    <img src="https://lenny22bolt.github.io/Clash-of-Titans-/loading-bg.png"
-         style="width:100%;height:100%;object-fit:cover;transform-origin:center center;animation:epicZoom 4s ease-in-out infinite alternate"
-         onerror="this.parentElement.style.background='#07111C'">
+    <picture>
+      <source srcset="https://lenny22bolt.github.io/Clash-of-Titans-/loading-bg.webp" type="image/webp">
+      <img src="https://lenny22bolt.github.io/Clash-of-Titans-/loading-bg.jpg"
+           style="width:100%;height:100%;object-fit:cover;transform-origin:center center;animation:epicZoom 4s ease-in-out infinite alternate;image-rendering:high-quality;-webkit-backface-visibility:hidden;backface-visibility:hidden"
+           onerror="this.parentElement.parentElement.style.background='#07111C'">
+    </picture>
   </div>
   <!-- Subtle dark vignette overlay -->
   <div style="position:absolute;inset:0;background:radial-gradient(ellipse at center, rgba(7,17,28,0.15) 0%, rgba(7,17,28,0.6) 100%);z-index:1"></div>
