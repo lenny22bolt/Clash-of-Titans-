@@ -254,6 +254,7 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
   <button class="nb"     onclick="showTab('power',this)">👑 Power Rankings</button>
   <button class="nb"     onclick="showTab('realmmap',this)">🗺 Realm Map</button>
   <button class="nb"     onclick="showTab('wheel',this)">🎰 Daily Wheel</button>
+  <button class="nb" id="cocommishNavBtn" style="display:none" onclick="showTab('cocommish',this)">🤖 Co-Commish</button>
   <button class="nb"     onclick="showTab('recap',this)">📜 Recap</button>
 </nav>
 
@@ -271,7 +272,8 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
     <div class="stitle">👑 Dynasty Power Rankings</div>
     <div id="powerwrap"></div>
   </div>
-  <div class="sec" id="sec-quests"><div class="stitle">🗡 Quest Board</div><div id="questswrap"></div></div>
+  <div class="sec" id="sec-cocommish"><div id="cocommishwrap"></div></div>
+  <div class="sec" id="sec-quests"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px"><div class="stitle" style="margin:0">🗡 Quest Board</div><button onclick="openWeeklyPayout()" style="font-family:Cinzel,serif;font-size:9px;font-weight:700;letter-spacing:1px;padding:6px 14px;border-radius:16px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer">💰 Weekly Payout</button></div><div id="questswrap"></div></div>
   <div class="sec" id="sec-realmmap"><div class="stitle">🗺 The Realm Map</div><div id="realmwrap"></div></div>
   <div class="sec" id="sec-wheel">
     <div class="stitle">🎰 Daily FAAB Wheel</div>
@@ -3321,6 +3323,42 @@ function openSignIn() {
   });
   grid.innerHTML = html;
 }
+// ── COMMISSIONER PIN ─────────────────────────────────────────
+var _commishUnlocked = false;
+var _pendingCommishBtn = null;
+
+function openCommishPin(btn) {
+  var m = getCurrentManager();
+  if (!m || m.name !== 'Heir of Zeus') return;
+  if (_commishUnlocked) {
+    // Already unlocked this session — go straight to tab
+    showTab('cocommish', btn);
+    return;
+  }
+  _pendingCommishBtn = btn;
+  document.getElementById('pinOverlay').style.display = 'flex';
+  document.getElementById('pinInput').value = '';
+  document.getElementById('pinError').textContent = '';
+  setTimeout(function(){ document.getElementById('pinInput').focus(); }, 100);
+}
+
+function submitPin() {
+  var pin = document.getElementById('pinInput').value;
+  if (pin === '0822') {
+    _commishUnlocked = true;
+    document.getElementById('pinOverlay').style.display = 'none';
+    showTab('cocommish', _pendingCommishBtn);
+  } else {
+    document.getElementById('pinError').textContent = '✕ Incorrect PIN';
+    document.getElementById('pinInput').value = '';
+    document.getElementById('pinInput').focus();
+  }
+}
+
+function closePinModal() {
+  document.getElementById('pinOverlay').style.display = 'none';
+}
+
 function signinSelect(btn){selectManager(btn.getAttribute('data-team'));}
 function selectManager(name) {
   var m = MANAGERS.find(function(x){return x.name===name;});
@@ -3339,6 +3377,9 @@ function updateSignInHeader() {
   var m = getCurrentManager();
   var wrap = document.getElementById('signinWrap');
   if (!wrap) return;
+  // Show Co-Commish tab only for Heir of Zeus (commissioner)
+  var coTab = document.getElementById('cocommishNavBtn');
+  if (coTab) coTab.style.display = (m && m.name === 'Heir of Zeus') ? '' : 'none';
   if (m) {
     var c = DIV_COLORS_SI[TEAM_DIVISIONS[m.name]||'north']||'#C9A84C';
     wrap.innerHTML = '<div style="display:flex;align-items:center;gap:6px">'
@@ -3390,6 +3431,520 @@ document.addEventListener('DOMContentLoaded',function(){
   updateSignInHeader();
   if(!getCurrentManager()) setTimeout(openSignIn,1200);
 });
+
+
+// ── CO-COMMISSIONER AI QUEST AUDIT SYSTEM ─────────────────────
+
+var QUEST_COMPLETIONS_KEY = 'questCompletions_v1';
+
+function getQuestCompletions() {
+  try { return JSON.parse(localStorage.getItem(QUEST_COMPLETIONS_KEY) || '{}'); } catch(e) { return {}; }
+}
+function saveQuestCompletions(data) {
+  localStorage.setItem(QUEST_COMPLETIONS_KEY, JSON.stringify(data));
+}
+
+// Get completions for a specific manager
+function getManagerCompletions(managerName) {
+  var all = getQuestCompletions();
+  return all[managerName] || [];
+}
+
+// Award a quest to a manager
+async function awardQuest(managerName, questId, weekNum, faab, evidence) {
+  var all = getQuestCompletions();
+  if (!all[managerName]) all[managerName] = [];
+
+  // Check if already awarded this quest this week (for repeat quests)
+  var quest = QUESTS.find(function(q){ return q.id === questId; });
+  if (!quest) return;
+
+  var existing = all[managerName].find(function(c){
+    return c.questId === questId && c.week === weekNum;
+  });
+  if (existing) return; // already awarded
+
+  var completion = {
+    questId: questId,
+    week: weekNum,
+    faab: faab,
+    evidence: evidence,
+    ts: Date.now()
+  };
+
+  all[managerName].push(completion);
+  saveQuestCompletions(all);
+
+  // Save to Supabase
+  if (sbReady()) {
+    var mgr = MANAGERS.find(function(m){ return m.name === managerName; });
+    await sbUpsert('quests', {
+      username: mgr ? mgr.username : managerName,
+      team_name: managerName,
+      quest_id: questId,
+      quest_title: quest.title,
+      week: weekNum,
+      faab_reward: faab,
+      evidence: evidence,
+      season: 2,
+      created_at: new Date().toISOString()
+    }, 'team_name,quest_id,week');
+  }
+}
+
+// Weekly payout summary
+function getWeeklyPayoutSummary(weekNum) {
+  var all = getQuestCompletions();
+  var summary = {};
+  Object.keys(all).forEach(function(manager) {
+    var weekCompletions = all[manager].filter(function(c){ return c.week === weekNum; });
+    if (weekCompletions.length) {
+      summary[manager] = {
+        completions: weekCompletions,
+        total: weekCompletions.reduce(function(sum, c){ return sum + c.faab; }, 0)
+      };
+    }
+  });
+  return summary;
+}
+
+// Quest leaderboard data
+function getQuestLeaderboard() {
+  var all = getQuestCompletions();
+  var lb = MANAGERS.map(function(m) {
+    var completions = all[m.name] || [];
+    return {
+      name: m.name,
+      emoji: m.emoji,
+      crest: m.crest,
+      count: completions.length,
+      totalFaab: completions.reduce(function(sum, c){ return sum + c.faab; }, 0)
+    };
+  });
+  return lb.sort(function(a, b){ return b.count - a.count || b.totalFaab - a.totalFaab; });
+}
+
+// ── CO-COMMISH AI AUDIT ──────────────────────────────────────
+
+// ── COMMISSIONER PIN ─────────────────────────────────────────
+var _commishUnlocked = false;
+
+function commishPINCheck() {
+  if (_commishUnlocked) {
+    var week = parseInt(document.getElementById('auditWeekSel').value);
+    runWeeklyQuestAudit(week);
+    return;
+  }
+  // Show PIN modal
+  document.getElementById('pinOverlay').style.display = 'flex';
+  document.getElementById('pinInput').value = '';
+  setTimeout(function(){ document.getElementById('pinInput').focus(); }, 100);
+}
+
+function submitCommishPIN() {
+  var pin = document.getElementById('pinInput').value;
+  if (pin === '0822') {
+    _commishUnlocked = true;
+    document.getElementById('pinOverlay').style.display = 'none';
+    var week = parseInt(document.getElementById('auditWeekSel').value);
+    runWeeklyQuestAudit(week);
+  } else {
+    document.getElementById('pinError').textContent = '✕ Incorrect PIN';
+    document.getElementById('pinInput').value = '';
+    document.getElementById('pinInput').focus();
+    setTimeout(function(){ document.getElementById('pinError').textContent = ''; }, 2000);
+  }
+}
+
+async function runWeeklyQuestAudit(weekNum) {
+  var btn = document.getElementById('auditBtn');
+  var status = document.getElementById('auditStatus');
+  var results = document.getElementById('auditResults');
+
+  if (btn) { btn.disabled = true; btn.textContent = '🤖 Auditing...'; }
+  if (status) { status.textContent = 'Pulling Sleeper data for Week ' + weekNum + '...'; status.style.color = 'var(--gold)'; }
+  if (results) results.innerHTML = '';
+
+  try {
+    // Pull all data needed from Sleeper
+    var matchupData   = await safeFetch('/league/' + LID + '/matchups/' + weekNum);
+    var transData     = await safeFetch('/league/' + LID + '/transactions/' + weekNum);
+    var rostData      = S.rosters || [];
+    var playersCache  = JSON.parse(localStorage.getItem('nflPlayers') || '{}');
+
+    if (!matchupData) throw new Error('Could not fetch matchup data from Sleeper');
+
+    // Build matchup pairs
+    var games = {};
+    matchupData.forEach(function(m) {
+      if (!games[m.matchup_id]) games[m.matchup_id] = [];
+      games[m.matchup_id].push(m);
+    });
+
+    // Build team name -> matchup data map
+    var teamMatchups = {};
+    Object.values(games).forEach(function(pair) {
+      if (pair.length !== 2) return;
+      var a = pair[0], b = pair[1];
+      var rA = rostData.find(function(r){ return r.roster_id === a.roster_id; });
+      var rB = rostData.find(function(r){ return r.roster_id === b.roster_id; });
+      if (!rA || !rB) return;
+      var nA = resolveTeamName(rA, getUser(rA.owner_id));
+      var nB = resolveTeamName(rB, getUser(rB.owner_id));
+      var pA = a.points || 0, pB = b.points || 0;
+
+      // Starters + bench scores
+      var startersA = a.starters || [], startersB = b.starters || [];
+      var playerScoresA = a.players_points || {}, playerScoresB = b.players_points || {};
+
+      teamMatchups[nA] = { team: nA, opp: nB, pts: pA, oppPts: pB, won: pA > pB, margin: Math.abs(pA-pB), starters: startersA, playerScores: playerScoresA, benchPlayers: (a.players||[]).filter(function(p){ return startersA.indexOf(p) === -1; }), roster: rA };
+      teamMatchups[nB] = { team: nB, opp: nA, pts: pB, oppPts: pA, won: pB > pA, margin: Math.abs(pA-pB), starters: startersB, playerScores: playerScoresB, benchPlayers: (b.players||[]).filter(function(p){ return startersB.indexOf(p) === -1; }), roster: rB };
+    });
+
+    // Build transaction summary
+    var transSummary = '';
+    if (transData && transData.length) {
+      transData.slice(0, 30).forEach(function(t) {
+        if (t.type === 'waiver') {
+          var adds = (t.adds ? Object.keys(t.adds) : []).map(function(pid){ var p = playersCache[pid]; return p ? p.full_name : pid; });
+          var drops = (t.drops ? Object.keys(t.drops) : []).map(function(pid){ var p = playersCache[pid]; return p ? p.full_name : pid; });
+          var rId = t.roster_ids && t.roster_ids[0];
+          var rr = rostData.find(function(r){ return r.roster_id === rId; });
+          var tn = rr ? resolveTeamName(rr, getUser(rr.owner_id)) : 'Unknown';
+          var bid = t.settings && t.settings.waiver_bid !== undefined ? '$' + t.settings.waiver_bid : '';
+          transSummary += tn + ' added ' + adds.join(', ') + (drops.length ? ' dropped ' + drops.join(', ') : '') + (bid ? ' bid:' + bid : '') + '\n';
+        } else if (t.type === 'trade') {
+          var traders = (t.roster_ids||[]).map(function(rid){ var rr = rostData.find(function(r){ return r.roster_id === rid; }); return rr ? resolveTeamName(rr, getUser(rr.owner_id)) : 'Unknown'; });
+          transSummary += 'TRADE: ' + traders.join(' + ') + '\n';
+        }
+      });
+    }
+
+    // Build standings context
+    var standingsCtx = '';
+    rostData.forEach(function(r) {
+      var tn = resolveTeamName(r, getUser(r.owner_id));
+      var w = r.settings && r.settings.wins || 0;
+      var l = r.settings && r.settings.losses || 0;
+      var pf = r.settings && r.settings.fpts || 0;
+      standingsCtx += tn + ': ' + w + '-' + l + ' PF:' + pf + '\n';
+    });
+
+    if (status) status.textContent = '🤖 Claude is analyzing all 86 quests...';
+
+    // Build the quest list for Claude
+    var questList = QUESTS.filter(function(q){ return q.status !== 'locked'; }).map(function(q){
+      return q.id + ' | ' + q.title + ' | $' + q.reward + ' | ' + (q.repeat ? 'REPEAT' : 'ONE-TIME') + ' | ' + q.desc;
+    }).join('\n');
+
+    // Build matchup summary for Claude
+    var matchupSummary = Object.values(teamMatchups).map(function(m) {
+      var starterScores = m.starters.map(function(pid) {
+        var p = playersCache[pid]; var pts = m.playerScores[pid] || 0;
+        return (p ? p.full_name + '(' + (p.position||'?') + ')' : pid) + ':' + pts;
+      }).join(', ');
+      var benchScores = m.benchPlayers.slice(0,5).map(function(pid) {
+        var p = playersCache[pid]; var pts = m.playerScores[pid] || 0;
+        return (p ? p.full_name + '(' + (p.position||'?') + ')' : pid) + ':' + pts;
+      }).join(', ');
+      return m.team + ' vs ' + m.opp + ' | Score:' + m.pts.toFixed(1) + ' OppScore:' + m.oppPts.toFixed(1) + ' | ' + (m.won?'WON':'LOST') + ' by ' + m.margin.toFixed(2) + '\nStarters: ' + starterScores + '\nBench: ' + benchScores;
+    }).join('\n\n');
+
+    // Claude prompt
+    var prompt = 'You are the Co-Commissioner AI for Clash of Titans dynasty fantasy football league.\n\n'
+      + 'WEEK ' + weekNum + ' DATA:\n\n'
+      + '=== MATCHUPS & SCORES ===\n' + matchupSummary + '\n\n'
+      + '=== TRANSACTIONS ===\n' + (transSummary || 'None') + '\n\n'
+      + '=== STANDINGS ===\n' + standingsCtx + '\n\n'
+      + '=== ALL 86 QUESTS (id | title | reward | type | description) ===\n' + questList + '\n\n'
+      + 'TASK: Analyze the week data and identify which managers completed which quests this week.\n'
+      + 'For each completion found, provide specific evidence from the data.\n'
+      + 'Only award quests that are clearly supported by the data.\n'
+      + 'For commissioner-verified quests (QB Catcher, Special Teams TD, etc.) flag them as NEEDS_VERIFY.\n\n'
+      + 'Return ONLY a valid JSON array like this:\n'
+      + '[{"manager":"Team Name","questId":"q_mightiest","questTitle":"Quest Title","faab":2,"evidence":"scored 142.5 pts, highest in league","needsVerify":false}]\n'
+      + 'Return empty array [] if no quests completed. NO other text, just the JSON array.';
+
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    var data = await response.json();
+    var text = data.content && data.content[0] && data.content[0].text || '[]';
+
+    // Parse JSON response
+    var clean = text.replace(/```json|```/g, '').trim();
+    var completions = JSON.parse(clean);
+
+    if (status) status.textContent = '✅ Found ' + completions.length + ' quest completions for Week ' + weekNum;
+
+    // Render approval UI
+    renderAuditResults(completions, weekNum);
+
+  } catch(e) {
+    console.error('Audit failed:', e);
+    if (status) { status.textContent = '⚠ Audit failed: ' + e.message; status.style.color = 'var(--red)'; }
+  }
+
+  if (btn) { btn.disabled = false; btn.textContent = '🤖 Run Week ' + weekNum + ' Audit'; }
+}
+
+function renderAuditResults(completions, weekNum) {
+  var results = document.getElementById('auditResults');
+  if (!results) return;
+
+  if (!completions.length) {
+    results.innerHTML = '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--dim);padding:16px;text-align:center">No quest completions detected for Week ' + weekNum + '</div>';
+    return;
+  }
+
+  var BASE = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
+  var pending = completions.filter(function(c){ return !c._approved && !c._skipped; });
+  var approved = completions.filter(function(c){ return c._approved; });
+
+  var html = '<div style="margin-top:12px">';
+  html += '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--gold);font-weight:700;margin-bottom:10px;letter-spacing:1px">';
+  html += '⚔ Week ' + weekNum + ' Quest Completions — ' + pending.length + ' pending · ' + approved.length + ' approved</div>';
+
+  completions.forEach(function(c, idx) {
+    var mgr = MANAGERS.find(function(m){ return m.name === c.manager; });
+    var divColor = mgr ? (DIV_COLORS_SI[TEAM_DIVISIONS[mgr.name]||'north']||'#C9A84C') : '#C9A84C';
+    var crestUrl = mgr && mgr.crest ? BASE + mgr.crest : '';
+    var bgColor = c._approved ? 'rgba(110,222,126,.08)' : c._skipped ? 'rgba(255,255,255,.02)' : c.needsVerify ? 'rgba(255,179,71,.08)' : 'rgba(201,168,76,.06)';
+    var borderColor = c._approved ? 'rgba(110,222,126,.3)' : c._skipped ? 'rgba(255,255,255,.05)' : c.needsVerify ? 'rgba(255,179,71,.3)' : 'rgba(201,168,76,.2)';
+    var opacity = c._skipped ? '0.4' : '1';
+
+    html += '<div style="background:' + bgColor + ';border:1px solid ' + borderColor + ';border-radius:12px;padding:12px 14px;margin-bottom:8px;opacity:' + opacity + ';display:flex;align-items:center;gap:10px">';
+
+    // Crest
+    if (crestUrl) html += '<img src="' + crestUrl + '" style="width:36px;height:36px;object-fit:contain;border-radius:6px;flex-shrink:0">';
+
+    // Info
+    html += '<div style="flex:1;min-width:0">';
+    html += '<div style="font-family:Cinzel,serif;font-size:10px;font-weight:700;color:' + divColor + '">' + c.manager + '</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--text);margin:2px 0">' + c.questTitle + ' · <span style="color:var(--gold);font-weight:700">+$' + c.faab + ' FAAB</span>' + (c.needsVerify ? ' <span style="color:#FFB347;font-size:9px">⚠ VERIFY</span>' : '') + '</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);line-height:1.4">' + c.evidence + '</div>';
+    html += '</div>';
+
+    // Buttons
+    if (!c._approved && !c._skipped) {
+      html += '<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">';
+      html += '<button onclick="approveQuest(' + idx + ',' + weekNum + ')" style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:5px 12px;border-radius:10px;border:1px solid rgba(110,222,126,.4);background:rgba(110,222,126,.12);color:#6EDE7E;cursor:pointer">✓ Award</button>';
+      html += '<button onclick="skipQuest(' + idx + ')" style="font-family:Cinzel,serif;font-size:9px;padding:5px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:none;color:var(--dim);cursor:pointer">✕ Skip</button>';
+      html += '</div>';
+    } else if (c._approved) {
+      html += '<div style="font-family:Cinzel,serif;font-size:9px;color:#6EDE7E;font-weight:700;flex-shrink:0">✓ AWARDED</div>';
+    } else {
+      html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);flex-shrink:0">SKIPPED</div>';
+    }
+
+    html += '</div>';
+  });
+
+  // Approve All + Payout buttons
+  var anyPending = completions.some(function(c){ return !c._approved && !c._skipped; });
+  if (anyPending) {
+    html += '<div style="display:flex;gap:8px;margin-top:12px;justify-content:center">';
+    html += '<button onclick="approveAllQuests(' + weekNum + ')" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:8px 20px;border-radius:16px;border:1px solid rgba(110,222,126,.4);background:rgba(110,222,126,.12);color:#6EDE7E;cursor:pointer">✓ Approve All</button>';
+    html += '</div>';
+  }
+
+  // Payout summary
+  var approvedCompletions = completions.filter(function(c){ return c._approved; });
+  if (approvedCompletions.length) {
+    html += renderPayoutSummary(approvedCompletions);
+  }
+
+  html += '</div>';
+  results.innerHTML = html;
+
+  // Store completions in memory for approve/skip callbacks
+  window._auditCompletions = completions;
+  window._auditWeek = weekNum;
+}
+
+function approveQuest(idx, weekNum) {
+  var completions = window._auditCompletions;
+  if (!completions || !completions[idx]) return;
+  var c = completions[idx];
+  c._approved = true;
+  awardQuest(c.manager, c.questId, weekNum, c.faab, c.evidence);
+  renderAuditResults(completions, weekNum);
+}
+
+function skipQuest(idx) {
+  var completions = window._auditCompletions;
+  if (!completions || !completions[idx]) return;
+  completions[idx]._skipped = true;
+  renderAuditResults(completions, window._auditWeek);
+}
+
+function approveAllQuests(weekNum) {
+  var completions = window._auditCompletions;
+  if (!completions) return;
+  completions.forEach(function(c, idx) {
+    if (!c._approved && !c._skipped) {
+      c._approved = true;
+      awardQuest(c.manager, c.questId, weekNum, c.faab, c.evidence);
+    }
+  });
+  renderAuditResults(completions, weekNum);
+}
+
+function renderPayoutSummary(approved) {
+  var totals = {};
+  approved.forEach(function(c) {
+    if (!totals[c.manager]) totals[c.manager] = { faab: 0, quests: [] };
+    totals[c.manager].faab += c.faab;
+    totals[c.manager].quests.push(c.questTitle);
+  });
+
+  var BASE = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
+  var html = '<div style="margin-top:16px;background:rgba(0,0,0,.3);border:1px solid var(--gold-border);border-radius:12px;padding:14px">';
+  html += '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--gold);font-weight:700;margin-bottom:10px;letter-spacing:1px">💰 Payout Summary — Award on Sleeper</div>';
+
+  var grandTotal = 0;
+  Object.keys(totals).sort(function(a,b){ return totals[b].faab - totals[a].faab; }).forEach(function(name) {
+    var t = totals[name];
+    var mgr = MANAGERS.find(function(m){ return m.name === name; });
+    var crestUrl = mgr && mgr.crest ? BASE + mgr.crest : '';
+    grandTotal += t.faab;
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">';
+    if (crestUrl) html += '<img src="' + crestUrl + '" style="width:24px;height:24px;object-fit:contain;border-radius:4px">';
+    html += '<div style="flex:1;font-family:Cinzel,serif;font-size:10px;color:var(--text)">' + name + '<div style="font-size:8px;color:var(--dim)">' + t.quests.join(', ') + '</div></div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:13px;font-weight:700;color:var(--gold)">+$' + t.faab + '</div>';
+    html += '</div>';
+  });
+
+  html += '<div style="margin-top:8px;text-align:right;font-family:Cinzel,serif;font-size:11px;color:var(--dim)">Total payout this week: <span style="color:var(--gold);font-weight:700">$' + grandTotal + ' FAAB</span></div>';
+  html += '</div>';
+  return html;
+}
+
+// ── RENDER CO-COMMISH TAB ────────────────────────────────────
+function renderCoCommish() {
+  var wrap = document.getElementById('cocommishwrap');
+  if (!wrap) return;
+  var week = S.week || 1;
+  var BASE = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
+
+  var html = '<div class="stitle">🤖 Co-Commissioner AI</div>';
+  html += '<div style="background:rgba(201,168,76,.06);border:1px solid var(--gold-border);border-radius:12px;padding:14px 16px;margin-bottom:16px;font-family:Cinzel,serif;font-size:11px;color:var(--text);line-height:1.8">';
+  html += '🤖 Claude analyzes all 86 quests against live Sleeper data. ';
+  html += 'Run the audit after Week results are final (Tuesday). ';
+  html += 'Review each detection, approve or skip, then use the payout summary to award FAAB on Sleeper.';
+  html += '</div>';
+
+  // Week selector + audit button
+  html += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">';
+  html += '<select id="auditWeekSel" style="font-family:Cinzel,serif;font-size:10px;background:rgba(0,0,0,.5);color:var(--text);border:1px solid var(--gold-border);border-radius:8px;padding:6px 12px">';
+  for (var w = 1; w <= 18; w++) {
+    html += '<option value="' + w + '"' + (w === week ? ' selected' : '') + '>Week ' + w + '</option>';
+  }
+  html += '</select>';
+  html += '<button id="auditBtn" onclick="commishPINCheck()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:8px 20px;border-radius:16px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer">🔐 Run Audit</button>';
+  html += '</div>';
+
+  html += '<div id="auditStatus" style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-bottom:8px"></div>';
+  html += '<div id="auditResults"></div>';
+
+  // Quest leaderboard
+  html += '<div class="stitle" style="margin-top:24px">📊 Quest Leaderboard</div>';
+  html += renderQuestLeaderboard();
+
+  wrap.innerHTML = html;
+}
+
+// ── QUEST LEADERBOARD ────────────────────────────────────────
+
+function renderQuestLeaderboard() {
+  var lb = getQuestLeaderboard();
+  var BASE = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
+  var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px">';
+
+  // Most quests completed
+  html += '<div style="background:rgba(0,0,0,.3);border:1px solid var(--gold-border);border-radius:12px;padding:12px">';
+  html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--gold);font-weight:700;margin-bottom:8px;letter-spacing:1px">📜 Quests Completed</div>';
+  lb.slice(0,8).forEach(function(m, i) {
+    var crestUrl = m.crest ? BASE + m.crest : '';
+    var medals = ['🥇','🥈','🥉','4.','5.','6.','7.','8.'];
+    var me = getCurrentManager() && getCurrentManager().name === m.name;
+    html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;' + (me?'color:var(--gold)':'') + '">';
+    html += '<span style="font-size:11px;min-width:20px">' + medals[i] + '</span>';
+    if (crestUrl) html += '<img src="' + crestUrl + '" style="width:20px;height:20px;object-fit:contain;border-radius:3px">';
+    html += '<div style="flex:1;font-family:Cinzel,serif;font-size:9px;color:' + (me?'var(--gold)':'var(--text)') + '">' + m.name.split(' ')[0] + '</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:var(--gold)">' + m.count + '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Most FAAB earned
+  var lbFaab = lb.slice().sort(function(a,b){ return b.totalFaab - a.totalFaab; });
+  html += '<div style="background:rgba(0,0,0,.3);border:1px solid var(--gold-border);border-radius:12px;padding:12px">';
+  html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--gold);font-weight:700;margin-bottom:8px;letter-spacing:1px">💰 FAAB Earned</div>';
+  lbFaab.slice(0,8).forEach(function(m, i) {
+    var crestUrl = m.crest ? BASE + m.crest : '';
+    var medals = ['🥇','🥈','🥉','4.','5.','6.','7.','8.'];
+    var me = getCurrentManager() && getCurrentManager().name === m.name;
+    html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 0">';
+    html += '<span style="font-size:11px;min-width:20px">' + medals[i] + '</span>';
+    if (crestUrl) html += '<img src="' + crestUrl + '" style="width:20px;height:20px;object-fit:contain;border-radius:3px">';
+    html += '<div style="flex:1;font-family:Cinzel,serif;font-size:9px;color:' + (me?'var(--gold)':'var(--text)') + '">' + m.name.split(' ')[0] + '</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:var(--gold)">$' + m.totalFaab + '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  html += '</div>';
+  return html;
+}
+
+// ── WEEKLY PAYOUT MODAL ──────────────────────────────────────
+
+function openWeeklyPayout() {
+  var week = S.week || 1;
+  var summary = getWeeklyPayoutSummary(week);
+  var BASE = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
+
+  var html = '<div style="font-family:Cinzel,serif;font-size:14px;font-weight:700;color:var(--gold);text-align:center;margin-bottom:16px;letter-spacing:2px">💰 Week ' + week + ' Quest Payouts</div>';
+
+  if (!Object.keys(summary).length) {
+    html += '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--dim);text-align:center;padding:20px">No quest completions recorded for Week ' + week + ' yet.<br>Run the Co-Commish Audit first.</div>';
+  } else {
+    var grandTotal = 0;
+    Object.keys(summary).sort(function(a,b){ return summary[b].total - summary[a].total; }).forEach(function(name) {
+      var t = summary[name];
+      var mgr = MANAGERS.find(function(m){ return m.name === name; });
+      var crestUrl = mgr && mgr.crest ? BASE + mgr.crest : '';
+      var divColor = mgr ? (DIV_COLORS_SI[TEAM_DIVISIONS[mgr.name]||'north']||'#C9A84C') : '#C9A84C';
+      grandTotal += t.total;
+      html += '<div style="background:rgba(0,0,0,.3);border:1px solid var(--gold-border);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">';
+      if (crestUrl) html += '<img src="' + crestUrl + '" style="width:32px;height:32px;object-fit:contain;border-radius:6px">';
+      html += '<div style="flex:1">';
+      html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:' + divColor + '">' + name + '</div>';
+      t.completions.forEach(function(c) {
+        html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim)">' + c.questTitle + ' · $' + c.faab + '</div>';
+      });
+      html += '</div>';
+      html += '<div style="font-family:Cinzel,serif;font-size:16px;font-weight:700;color:var(--gold)">+$' + t.total + '</div>';
+      html += '</div>';
+    });
+    html += '<div style="text-align:center;font-family:Cinzel,serif;font-size:12px;color:var(--dim);margin-top:12px">Total this week: <span style="color:var(--gold);font-weight:700;font-size:14px">$' + grandTotal + ' FAAB</span></div>';
+  }
+
+  html += '<div style="text-align:center;margin-top:16px"><button onclick="document.getElementById(\'payoutOverlay\').style.display=\'none\'" style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);background:none;border:none;cursor:pointer;letter-spacing:1px">✕ Close</button></div>';
+
+  var overlay = document.getElementById('payoutOverlay');
+  var inner = document.getElementById('payoutInner');
+  if (overlay && inner) { inner.innerHTML = html; overlay.style.display = 'flex'; }
+}
+
 
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -3960,6 +4515,49 @@ if ('serviceWorker' in navigator) {
     <div style="font-family:Cinzel,serif;font-size:clamp(8px,1.2vw,11px);color:#8899AA;letter-spacing:5px;text-transform:uppercase;margin-bottom:24px">Entering the Arena</div>
     <div style="width:200px;height:2px;background:rgba(201,168,76,.15);border-radius:2px;overflow:hidden">
       <div id="loadBar" style="height:100%;width:0%;background:linear-gradient(90deg,#C9A84C,#FFE08A);border-radius:2px"></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── WEEKLY PAYOUT MODAL ─────────────────────────────── -->
+<div id="payoutOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:linear-gradient(135deg,#0A1628,#132040);border:1px solid var(--gold-border);border-radius:20px;padding:24px;max-width:480px;width:94%;max-height:85vh;overflow-y:auto;box-shadow:0 0 60px rgba(201,168,76,.2)">
+    <div id="payoutInner"></div>
+  </div>
+</div>
+
+
+<!-- ── COMMISSIONER PIN MODAL ────────────────────────────── -->
+<div id="pinOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99999;align-items:center;justify-content:center">
+  <div style="background:linear-gradient(135deg,#0A1628,#132040);border:1px solid var(--gold-border);border-radius:20px;padding:32px 28px;max-width:320px;width:90%;text-align:center;box-shadow:0 0 60px rgba(201,168,76,.3)">
+    <div style="font-size:32px;margin-bottom:12px">🔐</div>
+    <div style="font-family:Cinzel,serif;font-size:14px;font-weight:700;color:var(--gold);letter-spacing:2px;margin-bottom:4px">Commissioner Access</div>
+    <div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-bottom:20px;letter-spacing:1px">Enter your PIN to run the audit</div>
+    <input id="pinInput" type="password" maxlength="4" placeholder="••••"
+      onkeydown="if(event.key==='Enter')submitCommishPIN()"
+      style="font-family:Cinzel,serif;font-size:20px;text-align:center;letter-spacing:8px;width:100%;padding:12px;border-radius:10px;border:1px solid var(--gold-border);background:rgba(0,0,0,.4);color:var(--gold);margin-bottom:8px;box-sizing:border-box;outline:none">
+    <div id="pinError" style="font-family:Cinzel,serif;font-size:10px;color:#FF6B6B;height:16px;margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px;justify-content:center">
+      <button onclick="submitCommishPIN()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:8px 24px;border-radius:14px;border:1px solid var(--gold-border);background:rgba(201,168,76,.15);color:var(--gold);cursor:pointer">Unlock</button>
+      <button onclick="document.getElementById('pinOverlay').style.display='none'" style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);background:none;border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:8px 16px;cursor:pointer">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── COMMISSIONER PIN MODAL ─────────────────────────────── -->
+<div id="pinOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99998;align-items:center;justify-content:center">
+  <div style="background:linear-gradient(135deg,#0A1628,#132040);border:1px solid var(--gold-border);border-radius:20px;padding:32px 28px;max-width:320px;width:90%;text-align:center;box-shadow:0 0 60px rgba(201,168,76,.3)">
+    <div style="font-size:32px;margin-bottom:12px">⚔</div>
+    <div style="font-family:Cinzel,serif;font-size:14px;font-weight:700;color:var(--gold);letter-spacing:2px;margin-bottom:4px">COMMISSIONER ACCESS</div>
+    <div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-bottom:20px;letter-spacing:1px">Enter your PIN to continue</div>
+    <input id="pinInput" type="password" maxlength="4" placeholder="••••"
+      onkeydown="if(event.key==='Enter')submitPin()"
+      style="font-family:Cinzel,serif;font-size:20px;letter-spacing:8px;text-align:center;background:rgba(0,0,0,.4);border:1px solid var(--gold-border);border-radius:12px;color:var(--gold);padding:12px 16px;width:100%;box-sizing:border-box;margin-bottom:8px;outline:none">
+    <div id="pinError" style="font-family:Cinzel,serif;font-size:10px;color:#FF6B6B;min-height:18px;margin-bottom:12px"></div>
+    <div style="display:flex;gap:10px;justify-content:center">
+      <button onclick="submitPin()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 28px;border-radius:16px;border:1px solid var(--gold-border);background:rgba(201,168,76,.15);color:var(--gold);cursor:pointer">Enter</button>
+      <button onclick="closePinModal()" style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);background:none;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:10px 20px;cursor:pointer">Cancel</button>
     </div>
   </div>
 </div>
