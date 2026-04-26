@@ -254,7 +254,7 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
   <button class="nb"     onclick="showTab('power',this)">👑 Power Rankings</button>
   <button class="nb"     onclick="showTab('realmmap',this)">🗺 Realm Map</button>
   <button class="nb"     onclick="showTab('wheel',this)">🎰 Daily Wheel</button>
-  <button class="nb" id="cocommishNavBtn" style="display:none" onclick="showTab('cocommish',this)">🤖 Co-Commish</button>
+  <button class="nb" id="cocommishNavBtn" style="display:none;margin-left:auto" onclick="openCommishPin(this)">🤖 Co-Commish</button>
   <button class="nb"     onclick="showTab('recap',this)">📜 Recap</button>
 </nav>
 
@@ -3834,28 +3834,97 @@ function renderCoCommish() {
   var week = S.week || 1;
   var BASE = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
 
-  var html = '<div class="stitle">🤖 Co-Commissioner AI</div>';
-  html += '<div style="background:rgba(201,168,76,.06);border:1px solid var(--gold-border);border-radius:12px;padding:14px 16px;margin-bottom:16px;font-family:Cinzel,serif;font-size:11px;color:var(--text);line-height:1.8">';
-  html += '🤖 Claude analyzes all 86 quests against live Sleeper data. ';
-  html += 'Run the audit after Week results are final (Tuesday). ';
-  html += 'Review each detection, approve or skip, then use the payout summary to award FAAB on Sleeper.';
-  html += '</div>';
+  var html = '<div class="stitle">⚔ Commissioner Control Center</div>';
 
-  // Week selector + audit button
-  html += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">';
+  // ── PAYOUT DASHBOARD ──────────────────────────────────────
+  html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-bottom:16px;letter-spacing:1px">Signed in as Commissioner · Week ' + week + '</div>';
+
+  // Build payout totals per manager from quests + wheel spins
+  var questCompletions = getQuestCompletions();
+  var wheelHistory = getWheelHistory();
+
+  // Per manager totals
+  var payouts = {};
+  MANAGERS.forEach(function(m) {
+    payouts[m.name] = { questFaab: 0, wheelFaab: 0, questCount: 0, questList: [], wheelList: [] };
+  });
+
+  // Quest FAAB
+  Object.keys(questCompletions).forEach(function(manager) {
+    if (!payouts[manager]) payouts[manager] = { questFaab:0, wheelFaab:0, questCount:0, questList:[], wheelList:[] };
+    var weekCompletions = questCompletions[manager].filter(function(c){ return c.week === week; });
+    weekCompletions.forEach(function(c) {
+      payouts[manager].questFaab += c.faab;
+      payouts[manager].questCount++;
+      payouts[manager].questList.push(c.questTitle + ' +$' + c.faab);
+    });
+  });
+
+  // Wheel FAAB
+  wheelHistory.forEach(function(h) {
+    var today = new Date().toDateString();
+    // Include all wheel wins for current week (approximate by date)
+    if (h.manager && payouts[h.manager] !== undefined) {
+      payouts[h.manager].wheelFaab += h.val;
+      if (h.val > 0) payouts[h.manager].wheelList.push('Wheel spin +$' + h.val);
+    }
+  });
+
+  // Payout table
+  var grandTotal = 0;
+  var anyPayout = Object.values(payouts).some(function(p){ return p.questFaab + p.wheelFaab > 0; });
+
+  html += '<div class="stitle" style="margin-bottom:10px">💰 Week ' + week + ' Payout Summary</div>';
+
+  if (!anyPayout) {
+    html += '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--dim);padding:16px;text-align:center;background:rgba(0,0,0,.2);border-radius:10px;margin-bottom:16px">No payouts recorded yet for Week ' + week + '.<br>Run the AI Audit below to detect quest completions.</div>';
+  } else {
+    html += '<div style="margin-bottom:16px">';
+    MANAGERS.forEach(function(m) {
+      var p = payouts[m.name];
+      var total = p.questFaab + p.wheelFaab;
+      if (total === 0) return;
+      grandTotal += total;
+      var div = TEAM_DIVISIONS[m.name] || 'north';
+      var dc = DIV_COLORS_SI[div] || '#C9A84C';
+      var crestUrl = m.crest ? BASE + m.crest : '';
+      html += '<div style="background:rgba(0,0,0,.3);border:1px solid rgba(201,168,76,.2);border-radius:12px;padding:12px 14px;margin-bottom:8px">';
+      html += '<div style="display:flex;align-items:center;gap:10px">';
+      if (crestUrl) html += '<img src="' + crestUrl + '" style="width:32px;height:32px;object-fit:contain;border-radius:6px;flex-shrink:0">';
+      html += '<div style="flex:1">';
+      html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:' + dc + '">' + m.name + '</div>';
+      if (p.questList.length) html += '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim);margin-top:2px">📜 ' + p.questList.join(' · ') + '</div>';
+      if (p.wheelList.length) html += '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim);margin-top:1px">🎰 ' + p.wheelList.join(' · ') + '</div>';
+      html += '</div>';
+      html += '<div style="text-align:right;flex-shrink:0">';
+      html += '<div style="font-family:Cinzel,serif;font-size:16px;font-weight:700;color:var(--gold)">+$' + total + '</div>';
+      if (p.questFaab && p.wheelFaab) {
+        html += '<div style="font-size:8px;color:var(--dim);font-family:Cinzel,serif">📜$' + p.questFaab + ' 🎰$' + p.wheelFaab + '</div>';
+      }
+      html += '</div></div></div>';
+    });
+    html += '<div style="text-align:right;font-family:Cinzel,serif;font-size:12px;color:var(--dim);padding:8px 4px">Total Week ' + week + ' payout: <span style="color:var(--gold);font-weight:700;font-size:15px">$' + grandTotal + ' FAAB</span></div>';
+    html += '</div>';
+  }
+
+  // ── AI AUDIT ──────────────────────────────────────────────
+  html += '<div style="background:rgba(201,168,76,.05);border:1px solid var(--gold-border);border-radius:14px;padding:16px;margin-bottom:16px">';
+  html += '<div class="stitle" style="margin-bottom:8px">🤖 AI Quest Audit</div>';
+  html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-bottom:12px;line-height:1.7">Claude analyzes all Sleeper data and detects quest completions automatically. Run after games finalize each week.</div>';
+  html += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
   html += '<select id="auditWeekSel" style="font-family:Cinzel,serif;font-size:10px;background:rgba(0,0,0,.5);color:var(--text);border:1px solid var(--gold-border);border-radius:8px;padding:6px 12px">';
   for (var w = 1; w <= 18; w++) {
     html += '<option value="' + w + '"' + (w === week ? ' selected' : '') + '>Week ' + w + '</option>';
   }
   html += '</select>';
-  html += '<button id="auditBtn" onclick="commishPINCheck()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:8px 20px;border-radius:16px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer">🔐 Run Audit</button>';
+  html += '<button id="auditBtn" onclick="runWeeklyQuestAudit(parseInt(document.getElementById(&quot;auditWeekSel&quot;).value))" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:8px 20px;border-radius:16px;border:1px solid var(--gold-border);background:rgba(201,168,76,.15);color:var(--gold);cursor:pointer">🤖 Run Audit</button>';
+  html += '</div>';
+  html += '<div id="auditStatus" style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-top:8px"></div>';
+  html += '<div id="auditResults"></div>';
   html += '</div>';
 
-  html += '<div id="auditStatus" style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-bottom:8px"></div>';
-  html += '<div id="auditResults"></div>';
-
-  // Quest leaderboard
-  html += '<div class="stitle" style="margin-top:24px">📊 Quest Leaderboard</div>';
+  // ── QUEST LEADERBOARD ────────────────────────────────────
+  html += '<div class="stitle" style="margin-top:8px;margin-bottom:10px">📊 Season Quest Leaderboard</div>';
   html += renderQuestLeaderboard();
 
   wrap.innerHTML = html;
