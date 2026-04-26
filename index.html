@@ -254,8 +254,8 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
   <button class="nb"     onclick="showTab('power',this)">👑 Power Rankings</button>
   <button class="nb"     onclick="showTab('realmmap',this)">🗺 Realm Map</button>
   <button class="nb"     onclick="showTab('wheel',this)">🎰 Daily Wheel</button>
-  <button class="nb" id="cocommishNavBtn" style="display:none;margin-left:auto" onclick="openCommishPin(this)">🤖 Co-Commish</button>
   <button class="nb"     onclick="showTab('recap',this)">📜 Recap</button>
+  <button class="nb" id="cocommishNavBtn" style="display:none;margin-left:auto" onclick="openCommishPin(this)">⚔ Co-Commish</button>
 </nav>
 
 <div class="main">
@@ -3127,7 +3127,7 @@ function spinWheel() {
     var today = new Date().toDateString();
     var todayISO = new Date().toISOString().split('T')[0];
     var history = getWheelHistory();
-    history.push({ manager:manager, val:result.val, date:today });
+    history.push({ manager:manager, val:result.val, date:today, week: S.week || 0 });
     saveWheelHistory(history);
     recordSpinDate(manager); // Track spin per manager separately from history
 
@@ -3348,6 +3348,7 @@ function submitPin() {
     _commishUnlocked = true;
     document.getElementById('pinOverlay').style.display = 'none';
     showTab('cocommish', _pendingCommishBtn);
+    setTimeout(renderCoCommish, 100);
   } else {
     document.getElementById('pinError').textContent = '✕ Incorrect PIN';
     document.getElementById('pinInput').value = '';
@@ -3424,7 +3425,7 @@ function showEpicLoading(m) {
   },800);
   setTimeout(function(){
     screen.style.transition='opacity 0.7s ease'; screen.style.opacity='0';
-    setTimeout(function(){screen.style.display='none';screen.style.opacity='1';screen.style.transition='';var t=document.querySelector('[data-tab="standings"]');if(t)t.click();},700);
+    setTimeout(function(){screen.style.display='none';screen.style.opacity='1';screen.style.transition='';if(!_pendingCommishBtn){var t=document.querySelector('.nb');if(t)t.click();}},700);
   },3200);
 }
 document.addEventListener('DOMContentLoaded',function(){
@@ -3795,6 +3796,8 @@ function approveAllQuests(weekNum) {
     }
   });
   renderAuditResults(completions, weekNum);
+  // After approving, refresh the payout summary
+  setTimeout(renderCoCommish, 300);
 }
 
 function renderPayoutSummary(approved) {
@@ -3831,106 +3834,185 @@ function renderPayoutSummary(approved) {
 function renderCoCommish() {
   var wrap = document.getElementById('cocommishwrap');
   if (!wrap) return;
+  if (!S || !S.rosters) {
+    wrap.innerHTML = '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--dim);padding:20px;text-align:center">⏳ Loading league data...</div>';
+    setTimeout(renderCoCommish, 800);
+    return;
+  }
+
   var week = S.week || 1;
   var BASE = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
-
-  var html = '<div class="stitle">⚔ Commissioner Control Center</div>';
-
-  // ── PAYOUT DASHBOARD ──────────────────────────────────────
-  html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-bottom:16px;letter-spacing:1px">Signed in as Commissioner · Week ' + week + '</div>';
-
-  // Build payout totals per manager from quests + wheel spins
   var questCompletions = getQuestCompletions();
   var wheelHistory = getWheelHistory();
 
-  // Per manager totals
+  // Get the submitted week from localStorage (week that has been paid out)
+  var submittedWeek = parseInt(localStorage.getItem('commishSubmittedWeek') || '0');
+  // Active payout week = submitted + 1, capped at current sleeper week
+  var activePayoutWeek = Math.min(submittedWeek + 1, week);
+
+  // Build weeks with data
+  var questCompletionsByWeek = {};
+  Object.keys(questCompletions).forEach(function(mgr) {
+    questCompletions[mgr].forEach(function(c) { questCompletionsByWeek[c.week] = true; });
+  });
+  var maxWeek = Math.max(week, activePayoutWeek, 1);
+
+  // Read selected week from existing dropdown
+  var selEl = document.getElementById('payoutWeekSel');
+  var selWeek = selEl ? parseInt(selEl.value) : activePayoutWeek;
+
+  var html = '<div class="stitle">⚔ Commissioner Control Center</div>';
+  html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-bottom:16px;letter-spacing:1px">Commissioner · Season 2 · Current Sleeper Week: ' + week + '</div>';
+
+  // ── STEP INDICATOR ──────────────────────────────────────────
+  html += '<div style="display:flex;gap:0;margin-bottom:20px;border-radius:12px;overflow:hidden;border:1px solid var(--gold-border)">';
+  var steps = ['1. Auto Quests Load', '2. Run Audit', '3. Pay Out FAAB', '4. Submit Week'];
+  steps.forEach(function(s, i) {
+    html += '<div style="flex:1;padding:8px 4px;text-align:center;font-family:Cinzel,serif;font-size:8px;letter-spacing:.5px;background:rgba(201,168,76,.08);color:var(--dim);border-right:' + (i<3?'1px solid var(--gold-border)':'none') + '">' + s + '</div>';
+  });
+  html += '</div>';
+
+  // ── PAYOUT WEEK SELECTOR ────────────────────────────────────
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">';
+  html += '<div class="stitle" style="margin:0">💰 Payout — Week</div>';
+  html += '<select id="payoutWeekSel" onchange="renderCoCommish()" style="font-family:Cinzel,serif;font-size:11px;font-weight:700;background:rgba(0,0,0,.5);color:var(--gold);border:1px solid var(--gold-border);border-radius:8px;padding:5px 12px">';
+  for (var pw = 1; pw <= maxWeek; pw++) {
+    var label = 'Week ' + pw;
+    if (pw === activePayoutWeek) label += ' ← Active';
+    if (pw <= submittedWeek) label += ' ✓ Paid';
+    html += '<option value="' + pw + '"' + (pw === selWeek ? ' selected' : '') + '>' + label + '</option>';
+  }
+  html += '</select>';
+  if (selWeek <= submittedWeek) {
+    html += '<span style="font-family:Cinzel,serif;font-size:9px;color:#6EDE7E;background:rgba(110,222,126,.1);padding:3px 8px;border-radius:8px;border:1px solid rgba(110,222,126,.2)">✓ Already Paid Out</span>';
+  }
+  html += '</div>';
+
+  // ── BUILD PAYOUT DATA FOR SELECTED WEEK ─────────────────────
   var payouts = {};
-  MANAGERS.forEach(function(m) {
-    payouts[m.name] = { questFaab: 0, wheelFaab: 0, questCount: 0, questList: [], wheelList: [] };
-  });
-
-  // Quest FAAB
+  MANAGERS.forEach(function(m) { payouts[m.name] = { questFaab:0, wheelFaab:0, questList:[], wheelList:[] }; });
   Object.keys(questCompletions).forEach(function(manager) {
-    if (!payouts[manager]) payouts[manager] = { questFaab:0, wheelFaab:0, questCount:0, questList:[], wheelList:[] };
-    var weekCompletions = questCompletions[manager].filter(function(c){ return c.week === week; });
-    weekCompletions.forEach(function(c) {
-      payouts[manager].questFaab += c.faab;
-      payouts[manager].questCount++;
-      payouts[manager].questList.push(c.questTitle + ' +$' + c.faab);
-    });
+    if (!payouts[manager]) payouts[manager] = { questFaab:0, wheelFaab:0, questList:[], wheelList:[] };
+    var wc = questCompletions[manager].filter(function(c){ return c.week === selWeek; });
+    wc.forEach(function(c) { payouts[manager].questFaab += c.faab; payouts[manager].questList.push(c.questTitle + ' +$' + c.faab); });
   });
-
-  // Wheel FAAB
   wheelHistory.forEach(function(h) {
-    var today = new Date().toDateString();
-    // Include all wheel wins for current week (approximate by date)
-    if (h.manager && payouts[h.manager] !== undefined) {
+    if (h.manager && payouts[h.manager] && h.week === selWeek && h.val > 0) {
       payouts[h.manager].wheelFaab += h.val;
-      if (h.val > 0) payouts[h.manager].wheelList.push('Wheel spin +$' + h.val);
+      payouts[h.manager].wheelList.push('Wheel +$' + h.val);
     }
   });
 
-  // Payout table
   var grandTotal = 0;
   var anyPayout = Object.values(payouts).some(function(p){ return p.questFaab + p.wheelFaab > 0; });
 
-  html += '<div class="stitle" style="margin-bottom:10px">💰 Week ' + week + ' Payout Summary</div>';
-
+  // ── PAYOUT TABLE ────────────────────────────────────────────
   if (!anyPayout) {
-    html += '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--dim);padding:16px;text-align:center;background:rgba(0,0,0,.2);border-radius:10px;margin-bottom:16px">No payouts recorded yet for Week ' + week + '.<br>Run the AI Audit below to detect quest completions.</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--dim);padding:16px;text-align:center;background:rgba(0,0,0,.2);border-radius:10px;margin-bottom:16px">';
+    html += 'No payouts yet for Week ' + selWeek + '.<br><span style="font-size:9px">Auto quests load when this tab opens. Run AI Audit for stragglers.</span></div>';
   } else {
-    html += '<div style="margin-bottom:16px">';
+    html += '<div style="margin-bottom:12px">';
     MANAGERS.forEach(function(m) {
       var p = payouts[m.name];
       var total = p.questFaab + p.wheelFaab;
-      if (total === 0) return;
+      if (!total) return;
       grandTotal += total;
       var div = TEAM_DIVISIONS[m.name] || 'north';
       var dc = DIV_COLORS_SI[div] || '#C9A84C';
       var crestUrl = m.crest ? BASE + m.crest : '';
-      html += '<div style="background:rgba(0,0,0,.3);border:1px solid rgba(201,168,76,.2);border-radius:12px;padding:12px 14px;margin-bottom:8px">';
-      html += '<div style="display:flex;align-items:center;gap:10px">';
-      if (crestUrl) html += '<img src="' + crestUrl + '" style="width:32px;height:32px;object-fit:contain;border-radius:6px;flex-shrink:0">';
-      html += '<div style="flex:1">';
-      html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:' + dc + '">' + m.name + '</div>';
-      if (p.questList.length) html += '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim);margin-top:2px">📜 ' + p.questList.join(' · ') + '</div>';
-      if (p.wheelList.length) html += '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim);margin-top:1px">🎰 ' + p.wheelList.join(' · ') + '</div>';
+      html += '<div style="background:rgba(0,0,0,.25);border:1px solid rgba(201,168,76,.15);border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">';
+      if (crestUrl) html += '<img src="' + crestUrl + '" style="width:28px;height:28px;object-fit:contain;border-radius:4px;flex-shrink:0">';
+      html += '<div style="flex:1;min-width:0">';
+      html += '<div style="font-family:Cinzel,serif;font-size:10px;font-weight:700;color:' + dc + '">' + m.name + '</div>';
+      if (p.questList.length) html += '<div style="font-size:8px;color:var(--dim);font-family:Cinzel,serif;margin-top:1px">📜 ' + p.questList.join(' · ') + '</div>';
+      if (p.wheelList.length) html += '<div style="font-size:8px;color:var(--dim);font-family:Cinzel,serif">🎰 ' + p.wheelList.join(' · ') + '</div>';
       html += '</div>';
-      html += '<div style="text-align:right;flex-shrink:0">';
-      html += '<div style="font-family:Cinzel,serif;font-size:16px;font-weight:700;color:var(--gold)">+$' + total + '</div>';
-      if (p.questFaab && p.wheelFaab) {
-        html += '<div style="font-size:8px;color:var(--dim);font-family:Cinzel,serif">📜$' + p.questFaab + ' 🎰$' + p.wheelFaab + '</div>';
-      }
-      html += '</div></div></div>';
+      html += '<div style="font-family:Cinzel,serif;font-size:15px;font-weight:700;color:var(--gold);flex-shrink:0">+$' + total + '</div>';
+      html += '</div>';
     });
-    html += '<div style="text-align:right;font-family:Cinzel,serif;font-size:12px;color:var(--dim);padding:8px 4px">Total Week ' + week + ' payout: <span style="color:var(--gold);font-weight:700;font-size:15px">$' + grandTotal + ' FAAB</span></div>';
+    html += '<div style="text-align:right;font-family:Cinzel,serif;font-size:11px;color:var(--dim);padding:6px 4px">';
+    html += 'Week ' + selWeek + ' total: <span style="color:var(--gold);font-weight:700;font-size:14px">$' + grandTotal + ' FAAB</span></div>';
     html += '</div>';
   }
 
-  // ── AI AUDIT ──────────────────────────────────────────────
-  html += '<div style="background:rgba(201,168,76,.05);border:1px solid var(--gold-border);border-radius:14px;padding:16px;margin-bottom:16px">';
-  html += '<div class="stitle" style="margin-bottom:8px">🤖 AI Quest Audit</div>';
-  html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-bottom:12px;line-height:1.7">Claude analyzes all Sleeper data and detects quest completions automatically. Run after games finalize each week.</div>';
-  html += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
-  html += '<select id="auditWeekSel" style="font-family:Cinzel,serif;font-size:10px;background:rgba(0,0,0,.5);color:var(--text);border:1px solid var(--gold-border);border-radius:8px;padding:6px 12px">';
-  for (var w = 1; w <= 18; w++) {
-    html += '<option value="' + w + '"' + (w === week ? ' selected' : '') + '>Week ' + w + '</option>';
+  // ── ACTION BUTTONS ──────────────────────────────────────────
+  html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">';
+
+  // AI Audit button (step 2)
+  html += '<button onclick="openAuditPanel()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:14px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer">🤖 Run AI Audit</button>';
+
+  // Confirm Payout + Submit Week buttons — only show for active payout week
+  if (selWeek === activePayoutWeek && selWeek > submittedWeek) {
+    html += '<button onclick="confirmPayoutStep(' + selWeek + ',' + grandTotal + ')" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:14px;border:1px solid rgba(201,168,76,.5);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer">💰 Confirm Payout — $' + grandTotal + ' FAAB</button>';
+    html += '<button id="submitWeekBtn" onclick="submitPayoutWeek(' + selWeek + ')" style="display:none;font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:14px;border:1px solid rgba(110,222,126,.4);background:rgba(110,222,126,.12);color:#6EDE7E;cursor:pointer">&#10003; Submit Week ' + selWeek + ' &#8594; Advance to Week ' + (selWeek+1) + '</button>';
+  } else if (selWeek <= submittedWeek) {
+    html += '<div style="font-family:Cinzel,serif;font-size:9px;color:#6EDE7E;padding:10px 16px;border-radius:14px;border:1px solid rgba(110,222,126,.2);background:rgba(110,222,126,.05)">✓ Week ' + selWeek + ' submitted & paid</div>';
+  }
+
+  html += '</div>';
+
+  // ── AI AUDIT PANEL (hidden by default) ──────────────────────
+  html += '<div id="auditPanel" style="display:none;background:rgba(201,168,76,.05);border:1px solid var(--gold-border);border-radius:14px;padding:16px;margin-bottom:16px">';
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">';
+  html += '<div class="stitle" style="margin:0">🤖 AI Quest Audit — Week</div>';
+  html += '<select id="auditWeekSel" style="font-family:Cinzel,serif;font-size:10px;background:rgba(0,0,0,.5);color:var(--text);border:1px solid var(--gold-border);border-radius:8px;padding:5px 10px">';
+  for (var aw = 1; aw <= maxWeek; aw++) {
+    html += '<option value="' + aw + '"' + (aw === selWeek ? ' selected' : '') + '>Week ' + aw + '</option>';
   }
   html += '</select>';
-  html += '<button id="auditBtn" onclick="runWeeklyQuestAudit(parseInt(document.getElementById(&quot;auditWeekSel&quot;).value))" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:8px 20px;border-radius:16px;border:1px solid var(--gold-border);background:rgba(201,168,76,.15);color:var(--gold);cursor:pointer">🤖 Run Audit</button>';
+  html += '<button id="auditBtn" onclick="runWeeklyQuestAudit(parseInt(document.getElementById(&quot;auditWeekSel&quot;).value))" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:8px 18px;border-radius:12px;border:1px solid var(--gold-border);background:rgba(201,168,76,.15);color:var(--gold);cursor:pointer">▶ Run</button>';
+  html += '<button onclick="closeAuditPanel()" style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);background:none;border:none;cursor:pointer">&#10005; Close</button>';
   html += '</div>';
-  html += '<div id="auditStatus" style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-top:8px"></div>';
+  html += '<div id="auditStatus" style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-bottom:8px"></div>';
   html += '<div id="auditResults"></div>';
   html += '</div>';
 
-  // ── QUEST LEADERBOARD ────────────────────────────────────
-  html += '<div class="stitle" style="margin-top:8px;margin-bottom:10px">📊 Season Quest Leaderboard</div>';
+  // ── QUEST LEADERBOARD ────────────────────────────────────────
+  html += '<div class="stitle" style="margin-top:8px;margin-bottom:10px">📊 Season Leaderboard</div>';
   html += renderQuestLeaderboard();
 
   wrap.innerHTML = html;
 }
 
-// ── QUEST LEADERBOARD ────────────────────────────────────────
+function closeAuditPanel() {
+  var panel = document.getElementById('auditPanel');
+  if (panel) panel.style.display = 'none';
+}
+function openAuditPanel() {
+  var panel = document.getElementById('auditPanel');
+  if (panel) { panel.style.display = (panel.style.display === 'none') ? 'block' : 'none'; }
+}
+
+function confirmPayoutStep(weekNum, total) {
+  // Build payout breakdown for confirm dialog
+  var completions = getQuestCompletions();
+  var wheelHistory = getWheelHistory();
+  var lines = [];
+  MANAGERS.forEach(function(m) {
+    var questFaab = 0, wheelFaab = 0;
+    var mc = completions[m.name] || [];
+    mc.filter(function(c){ return c.week === weekNum; }).forEach(function(c){ questFaab += c.faab; });
+    wheelHistory.filter(function(h){ return h.manager === m.name && h.week === weekNum && h.val > 0; }).forEach(function(h){ wheelFaab += h.val; });
+    var t = questFaab + wheelFaab;
+    if (t > 0) lines.push(m.name.split(' ')[0] + ': +$' + t);
+  });
+  var msg = 'CONFIRM WEEK ' + weekNum + ' PAYOUT\n\n'
+    + (lines.length ? lines.join('\n') : 'No payouts this week')
+    + '\n\nTotal: $' + total + ' FAAB'
+    + '\n\nHave you paid out all managers on Sleeper?';
+  if (!confirm(msg)) return;
+  // Show submit button
+  var btn = document.getElementById('submitWeekBtn');
+  if (btn) { btn.style.display = 'inline-block'; }
+}
+
+function submitPayoutWeek(weekNum) {
+  if (!confirm('Confirm: Week ' + weekNum + ' is fully paid out on Sleeper? This will advance to Week ' + (weekNum+1) + '.')) return;
+  localStorage.setItem('commishSubmittedWeek', weekNum);
+  renderCoCommish();
+  alert('✓ Week ' + weekNum + ' submitted. Now tracking Week ' + (weekNum+1) + '.');
+}
+
 
 function renderQuestLeaderboard() {
   var lb = getQuestLeaderboard();
