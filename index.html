@@ -248,6 +248,7 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
   <button class="nb"     onclick="showTab('picks',this)">Draft Picks</button>
   <button class="nb"     onclick="showTab('history',this)">S1 History</button>
   <button class="nb"     onclick="showTab('draft2026',this)">2026 Draft</button>
+  <button class="nb" id="liveDraftNavBtn" onclick="showTab('livedraft',this)">&#127944; Live Draft</button>
   <button class="nb"     onclick="showTab('treasury',this)">🏛 Treasury</button>
   <button class="nb"     onclick="showTab('fallen',this)">Fallen</button>
   <button class="nb"     onclick="showTab('quests',this)">🗡 Quests</button>
@@ -267,6 +268,7 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
   <div class="sec" id="sec-picks"><div class="stitle">Traded Draft Picks</div><div id="pklist"></div></div>
   <div class="sec" id="sec-history"><div class="stitle">Season 1 — Final Records</div><div id="hwrap"></div></div>
   <div class="sec" id="sec-draft2026"><div class="stitle">2026 Rookie Draft Order</div><div id="draft2026wrap"></div></div>
+  <div class="sec" id="sec-livedraft"><div class="stitle">&#127944; 2026 Rookie Draft — Live Board</div><div id="livedraftwrap"></div></div>
   <div class="sec" id="sec-treasury"><div class="stitle">🏛 Titan Treasury</div><div id="treasurywrap"></div></div>
   <div class="sec" id="sec-fallen"><div class="stitle">Fallen Warriors</div><div id="fallenwrap"></div></div>
   <div class="sec" id="sec-power">
@@ -275,7 +277,7 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
   </div>
   <div class="sec" id="sec-rankings"><div id="rankingswrap"></div></div>
   <div class="sec" id="sec-cocommish"><div id="cocommishwrap"></div></div>
-  <div class="sec" id="sec-quests"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px"><div class="stitle" style="margin:0">🗡 Quest Board</div><button onclick="openWeeklyPayout()" style="font-family:Cinzel,serif;font-size:9px;font-weight:700;letter-spacing:1px;padding:6px 14px;border-radius:16px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer">💰 Weekly Payout</button></div><div id="questswrap"></div></div>
+  <div class="sec" id="sec-quests"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px"><div class="stitle" style="margin:0">🗡 Quest Board</div></div><div id="questswrap"></div></div>
   <div class="sec" id="sec-realmmap"><div class="stitle">🗺 The Realm Map</div><div id="realmwrap"></div></div>
   <div class="sec" id="sec-wheel">
     <div class="stitle">🎰 Daily FAAB Wheel</div>
@@ -723,6 +725,8 @@ function renderStandings() {
       var rc  = i===0?'#C9A84C':i===1?'#A8A8A8':i===2?'#CD7F32':'var(--dim)';
       var s1  = getS1(u);
       var prevStr = s1 ? 'S1: '+s1.w+'-'+s1.l+' · '+s1.pts.toFixed(1)+' pts' : 'S1: —';
+      var mgr = MANAGERS.find(function(x){ return x.name===tn; }) || {};
+      var crestSrc = mgr.crest ? 'https://lenny22bolt.github.io/Clash-of-Titans-/' + mgr.crest : '';
       var avSrc = u.avatar ? AVA+u.avatar : '';
       var row = document.createElement('div');
       row.className = 'rrow';
@@ -755,6 +759,7 @@ function renderStandingsExtras() {
     var did = (r.settings && r.settings.division) || 1;
     var info = DIVMAP[did] || {name:'Division '+did, color:'#C9A84C'};
     var mgr = MANAGERS.find(function(m){ return m.name === name; })
+      || MANAGERS.find(function(m){ return m.username && u && u.display_name && m.username.toLowerCase() === u.display_name.toLowerCase(); })
       || MANAGERS.find(function(m){ 
            var mFirst = m.name.split(' ')[0].replace(/'/g,'');
            var nFirst = name.split(' ')[0].replace(/'/g,'');
@@ -789,22 +794,23 @@ function renderStandingsExtras() {
 
   // ── LEFT: Overall Record ──────────────────────────────────
   html += '<div style="background:rgba(0,0,0,.25);border:1px solid var(--gold-border);border-radius:14px;overflow:hidden">';
-  html += '<div style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:Cinzel,serif;font-size:10px;font-weight:700;color:var(--gold);letter-spacing:1px">&#9876; Overall Record</div>';
-  html += '<div style="display:grid;grid-template-columns:20px 1fr 28px 28px 50px;gap:0;padding:6px 12px;font-family:Cinzel,serif;font-size:8px;color:var(--dim);letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,.04)">';
-  html += '<div></div><div>TEAM</div><div style="text-align:center">W</div><div style="text-align:center">L</div><div style="text-align:right">PF</div></div>';
+  html += '<div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06);font-family:Cinzel,serif;font-size:12px;font-weight:700;color:var(--gold);letter-spacing:1px">&#9876; Overall Record</div>';
+  html += '<div style="display:grid;grid-template-columns:26px 36px 1fr 32px 32px 56px;gap:0;padding:6px 14px;font-family:Cinzel,serif;font-size:10px;color:var(--dim);letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,.04)">';
+  html += '<div></div><div></div><div style="padding-left:8px">TEAM</div><div style="text-align:center">W</div><div style="text-align:center">L</div><div style="text-align:right">PF</div></div>';
   allTeams.forEach(function(t, i) {
-    var crest = t.mgr && t.mgr.crest ? '<img src="' + BASE + t.mgr.crest + '" style="width:18px;height:18px;object-fit:contain;border-radius:3px;flex-shrink:0">' : '';
+    var crest = t.mgr && t.mgr.crest ? '<img src="' + BASE + t.mgr.crest + '" style="width:30px;height:30px;object-fit:contain;border-radius:5px;flex-shrink:0">' : '<div style="width:30px;height:30px;border-radius:5px;background:rgba(201,168,76,.1);border:1px solid var(--gold-border);flex-shrink:0"></div>';
     var isLeader = leaderNames.indexOf(t.name) !== -1;
     var me = getCurrentManager() && getCurrentManager().name === t.name;
-    html += '<div style="display:grid;grid-template-columns:20px 1fr 28px 28px 50px;gap:0;padding:6px 12px;align-items:center;background:' + (me?'rgba(201,168,76,.08)':'transparent') + ';border-bottom:1px solid rgba(255,255,255,.03)">';
-    html += '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim)">' + (i+1) + '</div>';
-    html += '<div style="display:flex;align-items:center;gap:5px;min-width:0">' + crest + '<div style="font-family:Cinzel,serif;font-size:9px;color:' + (me?'var(--gold)':t.divColor) + ';font-weight:' + (me?'700':'400') + ';line-height:1.3">' + t.name + (isLeader?' &#9670;':'') + '</div></div>';
-    html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:#6EDE7E;text-align:center">' + t.w + '</div>';
-    html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);text-align:center">' + t.l + '</div>';
-    html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);text-align:right">' + t.pf.toFixed(1) + '</div>';
+    html += '<div style="display:grid;grid-template-columns:26px 36px 1fr 32px 32px 56px;gap:0;padding:7px 14px;align-items:center;background:' + (me?'rgba(201,168,76,.08)':'transparent') + ';border-bottom:1px solid rgba(255,255,255,.03)">';
+    html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:var(--dim)">' + (i+1) + '</div>';
+    html += crest;
+    html += '<div style="font-family:Cinzel,serif;font-size:11px;color:' + (me?'var(--gold)':t.divColor) + ';font-weight:' + (me?'700':'400') + ';line-height:1.3;padding-left:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + t.name + (isLeader?' &#9670;':'') + '</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:13px;font-weight:700;color:#6EDE7E;text-align:center">' + t.w + '</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:12px;color:var(--dim);text-align:center">' + t.l + '</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--dim);text-align:right">' + t.pf.toFixed(1) + '</div>';
     html += '</div>';
   });
-  html += '<div style="padding:6px 12px;font-family:Cinzel,serif;font-size:8px;color:var(--dim)">&#9670; Division leader</div>';
+  html += '<div style="padding:7px 14px;font-family:Cinzel,serif;font-size:10px;color:var(--dim)">&#9670; Division leader</div>';
   html += '</div>';
 
   // ── RIGHT: Division Wins ───────────────────────────────────
@@ -819,24 +825,22 @@ function renderStandingsExtras() {
   });
 
   html += '<div style="background:rgba(0,0,0,.25);border:1px solid var(--gold-border);border-radius:14px;overflow:hidden">';
-  html += '<div style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:Cinzel,serif;font-size:10px;font-weight:700;color:var(--gold);letter-spacing:1px">&#9876; Division Wins</div>';
-  html += '<div style="display:grid;grid-template-columns:20px 1fr 40px 40px;gap:0;padding:6px 12px;font-family:Cinzel,serif;font-size:8px;color:var(--dim);letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,.04)">';
-  html += '<div></div><div>TEAM</div><div style="text-align:center">DIV W</div><div style="text-align:center">DIV L</div></div>';
+  html += '<div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06);font-family:Cinzel,serif;font-size:12px;font-weight:700;color:var(--gold);letter-spacing:1px">&#9876; Division Wins</div>';
+  html += '<div style="display:grid;grid-template-columns:26px 36px 1fr 46px 46px;gap:0;padding:6px 14px;font-family:Cinzel,serif;font-size:10px;color:var(--dim);letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,.04)">';
+  html += '<div></div><div></div><div style="padding-left:8px">TEAM</div><div style="text-align:center">DIV W</div><div style="text-align:center">DIV L</div></div>';
   byDivWins.forEach(function(t, i) {
-    var crest = t.mgr && t.mgr.crest ? '<img src="' + BASE + t.mgr.crest + '" style="width:18px;height:18px;object-fit:contain;border-radius:3px;flex-shrink:0">' : '';
+    var crest = t.mgr && t.mgr.crest ? '<img src="' + BASE + t.mgr.crest + '" style="width:30px;height:30px;object-fit:contain;border-radius:5px;flex-shrink:0">' : '<div style="width:30px;height:30px;border-radius:5px;background:rgba(201,168,76,.1);border:1px solid var(--gold-border);flex-shrink:0"></div>';
     var me = getCurrentManager() && getCurrentManager().name === t.name;
     var dw = divWinCounts[t.name] || 0;
-    var dl = 3 - dw; // 3 total div opponents (some may not be played yet)
-    var maxDivGames = 6; // full season div games
-    var pct = maxDivGames > 0 ? Math.round((dw/maxDivGames)*100) : 0;
-    html += '<div style="display:grid;grid-template-columns:20px 1fr 40px 40px;gap:0;padding:6px 12px;align-items:center;background:' + (me?'rgba(201,168,76,.08)':'transparent') + ';border-bottom:1px solid rgba(255,255,255,.03)">';
-    html += '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim)">' + (i+1) + '</div>';
-    html += '<div style="display:flex;align-items:center;gap:5px;min-width:0">' + crest + '<div style="font-family:Cinzel,serif;font-size:9px;color:' + (me?'var(--gold)':t.divColor) + ';font-weight:' + (me?'700':'400') + ';white-space:nowrap;overflow:hidden;line-height:1.3">' + t.name + '</div></div>';
-    html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:#6EDE7E;text-align:center">' + dw + '</div>';
-    html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);text-align:center">' + (t.l > 0 ? t.l : 0) + '</div>';
+    html += '<div style="display:grid;grid-template-columns:26px 36px 1fr 46px 46px;gap:0;padding:7px 14px;align-items:center;background:' + (me?'rgba(201,168,76,.08)':'transparent') + ';border-bottom:1px solid rgba(255,255,255,.03)">';
+    html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:var(--dim)">' + (i+1) + '</div>';
+    html += crest;
+    html += '<div style="font-family:Cinzel,serif;font-size:11px;color:' + (me?'var(--gold)':t.divColor) + ';font-weight:' + (me?'700':'400') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;padding-left:8px">' + t.name + '</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:13px;font-weight:700;color:#6EDE7E;text-align:center">' + dw + '</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:12px;color:var(--dim);text-align:center">' + (t.l > 0 ? t.l : 0) + '</div>';
     html += '</div>';
   });
-  html += '<div style="padding:6px 12px;font-family:Cinzel,serif;font-size:8px;color:var(--dim)">Max 6 division games per season</div>';
+  html += '<div style="padding:7px 14px;font-family:Cinzel,serif;font-size:10px;color:var(--dim)">Max 6 division games per season</div>';
   html += '</div>';
 
   html += '</div>'; // end grid
@@ -905,10 +909,19 @@ function renderRosterBtns() {
     var u  = getUser(r.owner_id);
     var tn = tname(r, u);
     var em = emo(tn);
+    var dispName = u && u.display_name ? u.display_name.toLowerCase() : '';
+    var mgr = MANAGERS.find(function(x){ return x.username && x.username.toLowerCase() === dispName; })
+           || MANAGERS.find(function(x){ return x.name === tn; })
+           || MANAGERS.find(function(x){ return x.name.replace(/\s/g,'').toLowerCase() === tn.replace(/\s/g,'').toLowerCase(); })
+           || {};
+    var crestSrc = mgr.crest ? 'https://lenny22bolt.github.io/Clash-of-Titans-/' + mgr.crest : '';
+    var safeEm = em.replace(/'/g, '&#39;');
     var btn = document.createElement('button');
     btn.className = 'rsbtn';
     btn.dataset.rid = r.roster_id;
-    btn.innerHTML = '<span style="font-size:13px">'+em+'</span><span>'+tn+'</span>';
+    btn.innerHTML = crestSrc
+      ? '<img src="'+crestSrc+'" style="width:20px;height:20px;object-fit:contain;border-radius:3px;flex-shrink:0" onerror="this.outerHTML=\'<span style=&quot;font-size:13px&quot;>'+safeEm+'</span>\'"><span>'+tn+'</span>'
+      : '<span style="font-size:13px">'+em+'</span><span>'+tn+'</span>';
     btn.onclick = function() {
       document.querySelectorAll('.rsbtn').forEach(function(b){b.classList.remove('on');});
       btn.classList.add('on');
@@ -968,8 +981,8 @@ function viewRoster(rosterId, switchTab) {
 
     // Team header row
     + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">'
-    +   '<div style="width:44px;height:44px;border-radius:50%;border:2px solid var(--gold);background:var(--navy-mid);display:flex;align-items:center;justify-content:center;font-size:22px;overflow:hidden;flex-shrink:0">'
-    +   (avSrc ? '<img src="'+avSrc+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.remove()">' : em)
+    +   '<div style="width:56px;height:56px;border-radius:10px;border:2px solid var(--gold-border);background:var(--navy-mid);display:flex;align-items:center;justify-content:center;font-size:22px;overflow:hidden;flex-shrink:0">'
+    +   (_mgr.crest ? '<img src="https://lenny22bolt.github.io/Clash-of-Titans-/'+_mgr.crest+'" style="width:100%;height:100%;object-fit:contain;border-radius:8px" onerror="this.parentElement.innerHTML=\''+em+'\'">' : em)
     +   '</div>'
     +   '<div style="flex:1">'
     +     '<div style="font-family:Cinzel,serif;font-size:15px;font-weight:700;color:var(--gold)">'+tn+'</div>'
@@ -1633,6 +1646,277 @@ function editPick(season, round, idx, cur) {
 
 function clearDraftOv() { if(confirm('Clear all overrides?')){ sessionStorage.removeItem('draftOv'); renderDraft2026(); } }
 
+// ── LIVE DRAFT BOARD ──────────────────────────────────────────────────────────
+var LIVE_DRAFT_TIMER = null;
+var LIVE_DRAFT_ID    = null;
+
+// Build the 48-pick slot map from DRAFT_ORDER + KNOWN_TRADES
+// Returns array of 48 objects: {round, slot, pickNum, originalOwner, currentOwner, isTrade}
+function buildPickSlots() {
+  var slots = [];
+  var pickNum = 1;
+  for (var r = 1; r <= 3; r++) {
+    for (var s = 0; s < 16; s++) {
+      var originalOwner = DRAFT_ORDER[s];
+      var currentOwner  = originalOwner;
+      var isTrade = false;
+      // Check KNOWN_TRADES for overrides
+      for (var t = 0; t < KNOWN_TRADES.length; t++) {
+        var tr = KNOWN_TRADES[t];
+        if (tr.season === '2026' && tr.round === r && tr.origSlot === s) {
+          currentOwner = tr.newOwner;
+          isTrade = true;
+          break;
+        }
+      }
+      slots.push({round: r, slot: s, pickNum: pickNum, originalOwner: originalOwner, currentOwner: currentOwner, isTrade: isTrade, player: null, pos: null, nflTeam: null});
+      pickNum++;
+    }
+  }
+  return slots;
+}
+
+function getCrestForTeam(teamName) {
+  var BASE = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
+  if (!teamName) return BASE + 'icon-512.png';
+  var tn = teamName.toLowerCase().replace(/\s/g,'');
+  var found = MANAGERS.find(function(m){ return m.name === teamName; })
+           || MANAGERS.find(function(m){ return m.name.toLowerCase().replace(/\s/g,'') === tn; })
+           || MANAGERS.find(function(m){ return teamName.toLowerCase().indexOf(m.name.split(' ')[0].toLowerCase()) !== -1; });
+  return found && found.crest ? (BASE + found.crest) : (BASE + 'icon-512.png');
+}
+
+function posColor(pos) {
+  if (!pos) return '#8899AA';
+  pos = pos.toUpperCase();
+  if (pos === 'QB') return '#FF6B6B';
+  if (pos === 'RB') return '#6EDE7E';
+  if (pos === 'WR') return '#7BB8E8';
+  if (pos === 'TE') return '#FFD580';
+  if (pos === 'K')  return '#DD99FF';
+  return '#C9A84C';
+}
+
+function renderLiveDraft() {
+  var wrap = document.getElementById('livedraftwrap');
+  if (!wrap) return;
+
+  // Stop any existing polling
+  if (LIVE_DRAFT_TIMER) { clearInterval(LIVE_DRAFT_TIMER); LIVE_DRAFT_TIMER = null; }
+
+  wrap.innerHTML = '<p style="color:var(--gold);font-family:Cinzel,serif;font-size:12px;text-align:center;padding:2rem">Loading draft data...</p>';
+
+  // Fetch drafts for the league, then find the 2026 rookie draft
+  var BASE = 'https://api.sleeper.app/v1/';
+  fetch(BASE + 'league/' + LID + '/drafts')
+    .then(function(r){ return r.json(); })
+    .then(function(drafts) {
+      if (!drafts || !drafts.length) { renderLiveDraftBoard([], null); return; }
+      // Find the most recent/active draft
+      var active = null;
+      for (var i = 0; i < drafts.length; i++) {
+        var d = drafts[i];
+        if (d.status === 'in_progress') { active = d; break; }
+      }
+      if (!active) {
+        // Fall back to the most recent draft (highest created timestamp)
+        active = drafts.sort(function(a,b){ return (b.created||0)-(a.created||0); })[0];
+      }
+      LIVE_DRAFT_ID = active ? active.draft_id : null;
+      if (!LIVE_DRAFT_ID) { renderLiveDraftBoard([], active); return; }
+
+      fetch(BASE + 'draft/' + LIVE_DRAFT_ID + '/picks')
+        .then(function(r2){ return r2.json(); })
+        .then(function(picks) {
+          renderLiveDraftBoard(picks || [], active);
+          // Auto-refresh every 30 seconds while tab is open
+          LIVE_DRAFT_TIMER = setInterval(function() {
+            if (!document.getElementById('sec-livedraft').classList.contains('on')) {
+              clearInterval(LIVE_DRAFT_TIMER); LIVE_DRAFT_TIMER = null; return;
+            }
+            fetch(BASE + 'draft/' + LIVE_DRAFT_ID + '/picks')
+              .then(function(r3){ return r3.json(); })
+              .then(function(p2) { renderLiveDraftBoard(p2 || [], active); })
+              .catch(function(){});
+          }, 30000);
+        })
+        .catch(function(){ renderLiveDraftBoard([], active); });
+    })
+    .catch(function(){ renderLiveDraftBoard([], null); });
+}
+
+function renderLiveDraftBoard(picks, draftObj) {
+  var wrap = document.getElementById('livedraftwrap');
+  if (!wrap) return;
+
+  var slots = buildPickSlots();
+  var totalPicks = slots.length; // 48
+
+  // Map completed picks onto slots by pick_no
+  var completedSet = {};
+  if (picks && picks.length) {
+    picks.forEach(function(p) {
+      var idx = (p.pick_no || 1) - 1;
+      if (idx >= 0 && idx < slots.length) {
+        var playerName = p.metadata ? (p.metadata.first_name || '') + ' ' + (p.metadata.last_name || '') : 'Unknown';
+        slots[idx].player  = playerName.trim() || 'Unknown';
+        slots[idx].pos     = p.metadata ? (p.metadata.position || '') : '';
+        slots[idx].nflTeam = p.metadata ? (p.metadata.team || '') : '';
+        completedSet[idx] = true;
+      }
+    });
+  }
+
+  var picksCompleted = picks ? picks.length : 0;
+  var nextPickIdx    = picksCompleted; // 0-based index of next pick
+  var isDraftDone    = picksCompleted >= totalPicks;
+  var isDraftLive    = draftObj && draftObj.status === 'in_progress';
+
+  // Status badge
+  var statusBadge = '';
+  if (isDraftDone) {
+    statusBadge = '<span style="background:#6EDE7E;color:#000;font-family:Cinzel,serif;font-size:10px;letter-spacing:2px;padding:4px 12px;border-radius:20px;font-weight:700">DRAFT COMPLETE</span>';
+  } else if (isDraftLive) {
+    statusBadge = '<span style="background:var(--red);color:#fff;font-family:Cinzel,serif;font-size:10px;letter-spacing:2px;padding:4px 12px;border-radius:20px;font-weight:700;animation:pulse 1.5s infinite">&#9679; LIVE</span>';
+  } else {
+    statusBadge = '<span style="background:rgba(201,168,76,0.2);color:var(--gold);font-family:Cinzel,serif;font-size:10px;letter-spacing:2px;padding:4px 12px;border-radius:20px;border:1px solid var(--gold-border)">PRE-DRAFT</span>';
+  }
+
+  // On the clock team
+  var onClockTeam = (!isDraftDone && nextPickIdx < slots.length) ? slots[nextPickIdx].currentOwner : null;
+  var onClockCrest = onClockTeam ? getCrestForTeam(onClockTeam) : '';
+
+  var html = '';
+
+  // Header bar
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:1.2rem">';
+  html += '<div>';
+  html += '<div style="font-family:Cinzel,serif;font-size:15px;font-weight:700;color:var(--gold);margin-bottom:4px">2026 Rookie Draft &nbsp;&#183;&nbsp; May 1st @ 7:30 PM</div>';
+  html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);letter-spacing:2px">' + picksCompleted + ' / ' + totalPicks + ' PICKS COMPLETE</div>';
+  html += '</div>';
+  html += '<div style="display:flex;align-items:center;gap:10px">' + statusBadge;
+  html += '<button onclick="renderLiveDraft()" style="font-family:Cinzel,serif;font-size:10px;letter-spacing:1px;padding:6px 14px;border-radius:20px;border:1px solid var(--gold-border);background:transparent;color:var(--gold);cursor:pointer">&#8635; Refresh</button>';
+  html += '</div>';
+  html += '</div>';
+
+  // On the clock banner
+  if (onClockTeam && isDraftLive) {
+    html += '<div style="display:flex;align-items:center;gap:14px;background:linear-gradient(90deg,rgba(201,168,76,0.15),transparent);border:1px solid var(--gold-border);border-radius:12px;padding:12px 16px;margin-bottom:1.4rem">';
+    html += '<img src="' + onClockCrest + '" style="width:48px;height:48px;object-fit:contain;border-radius:8px" onerror="this.src=\'https://lenny22bolt.github.io/Clash-of-Titans-/icon-512.png\'">';
+    html += '<div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--gold);letter-spacing:3px;margin-bottom:2px">ON THE CLOCK</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:16px;font-weight:700;color:#fff">' + onClockTeam + '</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim)">Pick ' + (nextPickIdx+1) + ' &nbsp;&#183;&nbsp; Round ' + slots[nextPickIdx].round + ', Slot ' + (slots[nextPickIdx].slot+1) + '</div>';
+    html += '</div></div>';
+  } else if (onClockTeam && !isDraftDone) {
+    // Pre-draft — show who picks first
+    html += '<div style="display:flex;align-items:center;gap:14px;background:rgba(7,17,28,0.6);border:1px solid var(--gold-border);border-radius:12px;padding:12px 16px;margin-bottom:1.4rem">';
+    html += '<img src="' + onClockCrest + '" style="width:48px;height:48px;object-fit:contain;border-radius:8px" onerror="this.src=\'https://lenny22bolt.github.io/Clash-of-Titans-/icon-512.png\'">';
+    html += '<div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);letter-spacing:3px;margin-bottom:2px">PICKING FIRST</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:16px;font-weight:700;color:var(--gold)">' + onClockTeam + '</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim)">1.01 &nbsp;&#183;&nbsp; Draft begins May 1 @ 7:30 PM</div>';
+    html += '</div></div>';
+  }
+
+  // Legend
+  html += '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:1rem;font-family:Cinzel,serif;font-size:10px;letter-spacing:1px">';
+  html += '<span style="color:var(--dim)">&#9632; Own pick</span>';
+  html += '<span style="color:#FFB347">&#9632; Traded pick</span>';
+  html += '<span style="color:var(--gold)">&#9632; On the clock</span>';
+  html += '<span style="color:#6EDE7E">&#9632; Completed</span>';
+  html += '</div>';
+
+  // Rounds
+  for (var r = 1; r <= 3; r++) {
+    html += '<div style="margin-bottom:1.6rem">';
+    html += '<div style="font-family:Cinzel,serif;font-size:11px;letter-spacing:3px;color:var(--gold);padding:8px 0 6px;border-bottom:1px solid var(--gold-border);margin-bottom:10px">ROUND ' + r + '</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px">';
+
+    for (var s2 = 0; s2 < slots.length; s2++) {
+      var sl = slots[s2];
+      if (sl.round !== r) continue;
+
+      var isCompleted  = !!completedSet[s2];
+      var isOnClock    = !isDraftDone && s2 === nextPickIdx && isDraftLive;
+      var isNextUp     = !isDraftDone && s2 === nextPickIdx && !isDraftLive;
+
+      var cardBg, cardBorder, labelColor;
+      if (isOnClock) {
+        cardBg = 'linear-gradient(135deg,rgba(201,168,76,0.25),rgba(201,168,76,0.05))';
+        cardBorder = 'var(--gold)';
+        labelColor = 'var(--gold)';
+      } else if (isCompleted) {
+        cardBg = 'rgba(110,222,126,0.07)';
+        cardBorder = 'rgba(110,222,126,0.3)';
+        labelColor = '#6EDE7E';
+      } else if (sl.isTrade) {
+        cardBg = 'rgba(255,179,71,0.07)';
+        cardBorder = 'rgba(255,179,71,0.4)';
+        labelColor = '#FFB347';
+      } else {
+        cardBg = 'rgba(13,27,42,0.7)';
+        cardBorder = 'rgba(201,168,76,0.15)';
+        labelColor = 'var(--dim)';
+      }
+
+      var roundSlot = r + '.' + (sl.slot < 9 ? '0' : '') + (sl.slot+1);
+
+      html += '<div style="background:' + cardBg + ';border:1px solid ' + cardBorder + ';border-radius:10px;padding:10px 10px 8px;position:relative;transition:all .2s">';
+
+      // Pick number badge + trade indicator
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
+      html += '<span style="font-family:Cinzel,serif;font-size:10px;font-weight:700;color:' + labelColor + '">' + roundSlot + '</span>';
+      if (sl.isTrade && !isCompleted) {
+        html += '<span style="font-family:Cinzel,serif;font-size:8px;letter-spacing:1px;color:#FFB347;background:rgba(255,179,71,0.15);padding:2px 6px;border-radius:8px">TRADED</span>';
+      }
+      if (isOnClock) {
+        html += '<span style="font-family:Cinzel,serif;font-size:8px;letter-spacing:1px;color:var(--gold);background:rgba(201,168,76,0.2);padding:2px 6px;border-radius:8px">ON CLOCK</span>';
+      }
+      html += '</div>';
+
+      if (isCompleted && sl.player) {
+        // Show player + team crest
+        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">';
+        html += '<img src="' + getCrestForTeam(sl.currentOwner) + '" style="width:28px;height:28px;object-fit:contain;border-radius:4px;flex-shrink:0" onerror="this.style.display=\'none\'">';
+        html += '<div>';
+        html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:#fff;line-height:1.2">' + sl.player + '</div>';
+        html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim)">' + sl.currentOwner + '</div>';
+        html += '</div></div>';
+        // Position + NFL team badge
+        if (sl.pos || sl.nflTeam) {
+          html += '<div style="display:flex;gap:4px;flex-wrap:wrap">';
+          if (sl.pos) html += '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;color:#000;background:' + posColor(sl.pos) + ';padding:2px 7px;border-radius:6px">' + sl.pos + '</span>';
+          if (sl.nflTeam) html += '<span style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);padding:2px 4px">' + sl.nflTeam + '</span>';
+          html += '</div>';
+        }
+      } else {
+        // Empty slot — show crest + owner name
+        html += '<div style="display:flex;align-items:center;gap:8px">';
+        html += '<img src="' + getCrestForTeam(sl.currentOwner) + '" style="width:28px;height:28px;object-fit:contain;border-radius:4px;opacity:' + (isOnClock ? '1' : '0.55') + ';flex-shrink:0" onerror="this.style.display=\'none\'">';
+        html += '<div>';
+        html += '<div style="font-family:Cinzel,serif;font-size:10px;color:' + (isOnClock ? '#fff' : 'var(--dim)') + ';font-weight:' + (isOnClock ? '700' : '400') + '">' + sl.currentOwner + '</div>';
+        if (sl.isTrade) {
+          html += '<div style="font-family:Cinzel,serif;font-size:8px;color:rgba(255,179,71,0.7)">from ' + sl.originalOwner + '</div>';
+        }
+        html += '</div></div>';
+      }
+
+      html += '</div>'; // card
+    }
+
+    html += '</div></div>'; // grid + round wrapper
+  }
+
+  // Auto-refresh notice
+  if (isDraftLive) {
+    html += '<div style="text-align:center;font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:2px;padding:8px 0">AUTO-REFRESHING EVERY 30 SECONDS</div>';
+  }
+
+  wrap.innerHTML = html;
+}
+// ── END LIVE DRAFT BOARD ──────────────────────────────────────────────────────
+
 // ── TREASURY ──────────────────────────────────────────────────
 var MANAGERS = [
   {name:"IceMonkey",               username:"IceMonkey",        emoji:"❄️", paid:true,  crest:"crest-icemonkey.png"},
@@ -1773,7 +2057,7 @@ function renderTreasury() {
     html += '<div style="text-align:center;font-family:Cinzel,serif;font-size:12px;color:var(--dim);letter-spacing:1px;padding:.5rem 0">No Titan crowned yet · Commissioner awards each week</div>';
   }
   html += '<div style="margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">'
-    + '<button onclick="crownTitan()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:7px 18px;border-radius:16px;border:1px solid var(--gold);background:transparent;color:var(--gold);cursor:pointer">👑 Crown Titan</button>'
+    + '<button onclick="crownTitan()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:7px 18px;border-radius:16px;border:1px solid var(--gold);background:transparent;color:var(--gold);cursor:pointer">&#9889; Auto-Detect Warrior</button>'
     + (titanHistory.length ? '<button onclick="showTitanHistory()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:7px 18px;border-radius:16px;border:1px solid var(--gold-border);background:transparent;color:var(--dim);cursor:pointer">📜 Hall of Titans ('+titanHistory.length+')</button>' : '')
     + '</div>';
   if (titanHistory.length) {
@@ -1825,20 +2109,36 @@ function showTitanHistory() {
 }
 
 function crownTitan() {
-  var list = MANAGERS.map(function(m,i){ return (i+1)+'. '+m.name; }).join('\n');
-  var input = prompt('Crown Titan of the Week — enter team name:\n\n'+list);
-  if (!input) return;
-  var match = MANAGERS.find(function(m){ return m.name.toLowerCase().includes(input.toLowerCase()); });
-  if (!match) { alert('Team not found. Try again.'); return; }
-  var week = parseInt(prompt('Week number:', S.week||1))||1;
-  var pts  = prompt('Score this week (e.g. 158.4):', '')||'—';
-  var player = prompt('Star player? (optional, e.g. Josh Allen 44pts)', '')||'';
-  var titan = { name:match.name, week:week, pts:pts, player:player };
+  // Auto-detect from Sleeper matchup data — find highest scorer this week
+  var week = S.week || 1;
+  var bestName = null, bestPts = 0;
+  if (S.matchups && S.matchups.length) {
+    S.matchups.forEach(function(m) {
+      var pts = (m.points || 0) + ((m.custom_points||0));
+      if (pts > bestPts) {
+        bestPts = pts;
+        var r = S.rosters && S.rosters.find(function(ro){ return ro.roster_id === m.roster_id; });
+        var u = r ? getUser(r.owner_id) : null;
+        bestName = r ? resolveTeamName(r, u) : null;
+      }
+    });
+  }
+  if (!bestName) { alert('No matchup data loaded yet. Make sure the current week\'s matchups are available.'); return; }
+  var confirmMsg = 'Auto-detected Warrior of the Week:\n\n' + bestName + ' · ' + bestPts.toFixed(2) + ' pts\n\nCrown them as Week ' + week + ' Titan?';
+  if (!confirm(confirmMsg)) return;
+  var match = MANAGERS.find(function(m){ return m.name === bestName; });
+  if (!match) return;
+  var starPlayer = prompt('Star player? (optional, e.g. Josh Allen 44pts — press OK to skip)', '') || '';
+  var titan = { name: match.name, week: week, pts: bestPts.toFixed(2), player: starPlayer };
   saveTitanOfWeek(titan);
-  var hist = getTitanHistory().filter(function(t){ return t.week!==week; });
+  var hist = getTitanHistory().filter(function(t){ return t.week !== week; });
   hist.push(titan);
   localStorage.setItem('titanHistory', JSON.stringify(hist));
+  // Re-render both treasury and co-commish so Pay $20 button appears immediately
   renderTreasury();
+  if (document.getElementById('sec-cocommish') && document.getElementById('sec-cocommish').classList.contains('on')) {
+    renderCoCommish();
+  }
 }
 
 async function togglePaid(el) {
@@ -2050,6 +2350,50 @@ function getOrderedQuests() {
 
 function renderQuests() {
   var wrap = document.getElementById('questswrap');
+
+  // ── SIGNED-IN MANAGER FAAB BANNER ────────────────────────────
+  var me = getCurrentManager();
+  var questBannerHtml = '';
+  if (me && me.name) {
+    var completions = getQuestCompletions();
+    var wheelHistory = getWheelHistory();
+    var curWeek = S.week || 1;
+    var mc = completions[me.name] || [];
+    // This week
+    var weekQuestFaab = 0, weekWheelFaab = 0;
+    mc.filter(function(c){ return c.week === curWeek; }).forEach(function(c){ weekQuestFaab += c.faab; });
+    wheelHistory.filter(function(h){ return h.manager === me.name && h.week === curWeek && h.val > 0; }).forEach(function(h){ weekWheelFaab += h.val; });
+    var weekTotal = weekQuestFaab + weekWheelFaab;
+    // All time
+    var allQuestFaab = mc.reduce(function(s,c){ return s+c.faab; }, 0);
+    var allWheelFaab = wheelHistory.filter(function(h){ return h.manager === me.name && h.val > 0; }).reduce(function(s,h){ return s+h.val; }, 0);
+    var allTotal = allQuestFaab + allWheelFaab;
+    var questCount = mc.length;
+    // Milestone info
+    var milestones = [{n:10,lbl:'Initiate',reward:3},{n:25,lbl:'Veteran',reward:8},{n:30,lbl:'Champion',reward:15},{n:40,lbl:'Master',reward:40},{n:50,lbl:'Legend',reward:50}];
+    var nextMilestone = null;
+    for (var mi=0;mi<milestones.length;mi++){ if(questCount < milestones[mi].n){ nextMilestone = milestones[mi]; break; } }
+    var mgrInfo = MANAGERS.find(function(x){ return x.name === me.name; }) || {};
+    var BASE_IMG = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
+    questBannerHtml = '<div style="background:linear-gradient(135deg,rgba(201,168,76,0.12),rgba(201,168,76,0.04));border:1.5px solid rgba(201,168,76,0.35);border-radius:14px;padding:14px 16px;margin-bottom:1.2rem;display:flex;align-items:center;gap:14px;flex-wrap:wrap">';
+    if (mgrInfo.crest) questBannerHtml += '<img src="'+BASE_IMG+mgrInfo.crest+'" style="width:48px;height:48px;object-fit:contain;border-radius:8px;flex-shrink:0" onerror="this.style.display=\'none\'">';
+    questBannerHtml += '<div style="flex:1;min-width:0">';
+    questBannerHtml += '<div style="font-family:Cinzel,serif;font-size:10px;letter-spacing:2px;color:var(--gold);margin-bottom:4px">' + me.name.toUpperCase() + ' &#183; QUEST EARNINGS</div>';
+    questBannerHtml += '<div style="display:flex;gap:16px;flex-wrap:wrap">';
+    questBannerHtml += '<div style="text-align:center"><div style="font-family:Cinzel,serif;font-size:20px;font-weight:700;color:' + (weekTotal>0?'var(--gold)':'var(--dim)') + '">$'+weekTotal+'</div><div style="font-family:Cinzel,serif;font-size:8px;letter-spacing:1.5px;color:var(--dim)">WEEK '+curWeek+'</div></div>';
+    questBannerHtml += '<div style="width:1px;background:var(--gold-border);align-self:stretch"></div>';
+    questBannerHtml += '<div style="text-align:center"><div style="font-family:Cinzel,serif;font-size:20px;font-weight:700;color:var(--gold)">$'+allTotal+'</div><div style="font-family:Cinzel,serif;font-size:8px;letter-spacing:1.5px;color:var(--dim)">ALL TIME</div></div>';
+    questBannerHtml += '<div style="width:1px;background:var(--gold-border);align-self:stretch"></div>';
+    questBannerHtml += '<div style="text-align:center"><div style="font-family:Cinzel,serif;font-size:20px;font-weight:700;color:var(--gold)">'+questCount+'</div><div style="font-family:Cinzel,serif;font-size:8px;letter-spacing:1.5px;color:var(--dim)">QUESTS</div></div>';
+    if (nextMilestone) {
+      questBannerHtml += '<div style="width:1px;background:var(--gold-border);align-self:stretch"></div>';
+      questBannerHtml += '<div><div style="font-family:Cinzel,serif;font-size:8px;letter-spacing:1px;color:var(--dim);margin-bottom:3px">NEXT: '+nextMilestone.lbl.toUpperCase()+' ($'+nextMilestone.reward+')</div>';
+      var pct = Math.round(questCount/nextMilestone.n*100);
+      questBannerHtml += '<div style="background:rgba(255,255,255,.08);border-radius:4px;height:6px;width:100px;overflow:hidden"><div style="height:100%;background:var(--gold);border-radius:4px;width:'+pct+'%"></div></div>';
+      questBannerHtml += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);margin-top:2px">'+questCount+' / '+nextMilestone.n+'</div></div>';
+    }
+    questBannerHtml += '</div></div></div>';
+  }
   // Hot team bounties
   var hot = S.rosters.filter(function(r){return (r.settings&&r.settings.wins||0)>=2;}).slice(0,3).map(function(r){
     var u=getUser(r.owner_id); return {name:tname(r,u),w:r.settings&&r.settings.wins||0,l:r.settings&&r.settings.losses||0,em:emo(tname(r,u))};
@@ -2071,7 +2415,7 @@ function renderQuests() {
     + '<button class="qfbtn"    id="qf_meta"        onclick="filterQ(\'meta\',this)">📜 Meta</button>'
     + '</div>';
 
-  var html = '<div style="background:rgba(255,107,107,0.08);border:1px solid rgba(255,107,107,0.25);border-radius:10px;padding:12px 16px;margin-bottom:1.2rem;font-family:Cinzel,serif;font-size:11px;color:var(--text);line-height:1.7">'
+  var html = questBannerHtml + '<div style="background:rgba(255,107,107,0.08);border:1px solid rgba(255,107,107,0.25);border-radius:10px;padding:12px 16px;margin-bottom:1.2rem;font-family:Cinzel,serif;font-size:11px;color:var(--text);line-height:1.7">'
     + '🗡 <strong style="color:var(--red)">'+underdog+' Underdog Quests</strong> designed specifically for struggling teams — <strong>Giant Killer, Bounce Back, Moneyball, Zero to Hero, Most Improved</strong>. '
     + 'These award the most FAAB to teams who need it most. 💪'
     + '</div>'
@@ -2919,6 +3263,7 @@ function showTab(tab, btn) {
   // Re-render wheel fresh each time tab is opened so spin state reflects current manager
   if (tab === 'wheel') setTimeout(renderWheel, 50);
   if (tab === 'rankings') setTimeout(renderRankings, 50);
+  if (tab === 'livedraft') setTimeout(renderLiveDraft, 50);
 }
 
 // ── API ───────────────────────────────────────────────────────
@@ -3829,6 +4174,8 @@ async function runWeeklyQuestAudit(weekNum) {
 function renderAuditResults(completions, weekNum) {
   var results = document.getElementById('auditResults');
   if (!results) return;
+  // Mark step 2 done — audit has been run
+  markStepDone(weekNum, 2);
 
   if (!completions.length) {
     results.innerHTML = '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--dim);padding:16px;text-align:center">No quest completions detected for Week ' + weekNum + '</div>';
@@ -3995,11 +4342,31 @@ function renderCoCommish() {
   var html = '<div class="stitle">⚔ Commissioner Control Center</div>';
   html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-bottom:16px;letter-spacing:1px">Commissioner · Season 2 · Current Sleeper Week: ' + week + '</div>';
 
+  // ── STEP PROGRESS TRACKING ───────────────────────────────────
+  // Steps completed are stored per week in localStorage
+  function getStepsDone(wk) { try { return JSON.parse(localStorage.getItem('commishSteps_wk'+wk)||'[]'); } catch(e) { return []; } }
+  var stepsDone = getStepsDone(selWeek);
+  // Step 1 always done once we open the tab (quests auto-load)
+  if (stepsDone.indexOf(1) === -1) { stepsDone.push(1); localStorage.setItem('commishSteps_wk'+selWeek, JSON.stringify(stepsDone)); }
+  // Step 5 done if already submitted
+  if (selWeek <= submittedWeek && stepsDone.indexOf(5) === -1) { stepsDone.push(5); localStorage.setItem('commishSteps_wk'+selWeek, JSON.stringify(stepsDone)); }
+
   // ── STEP INDICATOR ──────────────────────────────────────────
+  var stepDefs = [
+    {n:1, label:'Auto Quests Load'},
+    {n:2, label:'Run AI Audit'},
+    {n:3, label:'Confirm FAAB'},
+    {n:4, label:'Pay Warrior'},
+    {n:5, label:'Submit Week'}
+  ];
   html += '<div style="display:flex;gap:0;margin-bottom:20px;border-radius:12px;overflow:hidden;border:1px solid var(--gold-border)">';
-  var steps = ['1. Auto Quests Load', '2. Run Audit', '3. Pay Out FAAB', '4. Submit Week'];
-  steps.forEach(function(s, i) {
-    html += '<div style="flex:1;padding:8px 4px;text-align:center;font-family:Cinzel,serif;font-size:8px;letter-spacing:.5px;background:rgba(201,168,76,.08);color:var(--dim);border-right:' + (i<3?'1px solid var(--gold-border)':'none') + '">' + s + '</div>';
+  stepDefs.forEach(function(step, i) {
+    var done = stepsDone.indexOf(step.n) !== -1;
+    var bg   = done ? 'rgba(110,222,126,.15)' : 'rgba(201,168,76,.06)';
+    var col  = done ? '#6EDE7E' : 'var(--dim)';
+    var border = i < 4 ? '1px solid var(--gold-border)' : 'none';
+    var check = done ? '&#10003; ' : (step.n + '. ');
+    html += '<div style="flex:1;padding:10px 4px;text-align:center;font-family:Cinzel,serif;font-size:8px;letter-spacing:.5px;background:' + bg + ';color:' + col + ';border-right:' + border + ';font-weight:' + (done?'700':'400') + ';transition:all .3s">' + check + step.label + '</div>';
   });
   html += '</div>';
 
@@ -4021,9 +4388,9 @@ function renderCoCommish() {
 
   // ── BUILD PAYOUT DATA FOR SELECTED WEEK ─────────────────────
   var payouts = {};
-  MANAGERS.forEach(function(m) { payouts[m.name] = { questFaab:0, wheelFaab:0, questList:[], wheelList:[] }; });
+  MANAGERS.forEach(function(m) { payouts[m.name] = { questFaab:0, wheelFaab:0, warriorFaab:0, questList:[], wheelList:[] }; });
   Object.keys(questCompletions).forEach(function(manager) {
-    if (!payouts[manager]) payouts[manager] = { questFaab:0, wheelFaab:0, questList:[], wheelList:[] };
+    if (!payouts[manager]) payouts[manager] = { questFaab:0, wheelFaab:0, warriorFaab:0, questList:[], wheelList:[] };
     var wc = questCompletions[manager].filter(function(c){ return c.week === selWeek; });
     wc.forEach(function(c) { payouts[manager].questFaab += c.faab; payouts[manager].questList.push(c.questTitle + ' +$' + c.faab); });
   });
@@ -4033,6 +4400,13 @@ function renderCoCommish() {
       payouts[h.manager].wheelList.push('Wheel +$' + h.val);
     }
   });
+  // Add Warrior of the Week $20 payout if titan was crowned for this week
+  var titanHistory = getTitanHistory();
+  var weekTitan = titanHistory.find(function(t){ return t.week === selWeek; });
+  if (weekTitan && weekTitan.name) {
+    if (!payouts[weekTitan.name]) payouts[weekTitan.name] = { questFaab:0, wheelFaab:0, warriorFaab:0, questList:[], wheelList:[] };
+    payouts[weekTitan.name].warriorFaab = 20;
+  }
 
   var grandTotal = 0;
   var anyPayout = Object.values(payouts).some(function(p){ return p.questFaab + p.wheelFaab > 0; });
@@ -4044,8 +4418,8 @@ function renderCoCommish() {
   } else {
     html += '<div style="margin-bottom:12px">';
     MANAGERS.forEach(function(m) {
-      var p = payouts[m.name] || { questFaab:0, wheelFaab:0, questList:[], wheelList:[] };
-      var total = p.questFaab + p.wheelFaab;
+      var p = payouts[m.name] || { questFaab:0, wheelFaab:0, warriorFaab:0, questList:[], wheelList:[] };
+      var total = p.questFaab + p.wheelFaab + (p.warriorFaab||0);
       grandTotal += total;
       var dimmed = total === 0;
       var div = TEAM_DIVISIONS[m.name] || 'north';
@@ -4055,8 +4429,9 @@ function renderCoCommish() {
       if (crestUrl) html += '<img src="' + crestUrl + '" style="width:28px;height:28px;object-fit:contain;border-radius:4px;flex-shrink:0">';
       html += '<div style="flex:1;min-width:0">';
       html += '<div style="font-family:Cinzel,serif;font-size:10px;font-weight:700;color:' + dc + '">' + m.name + '</div>';
-      if (p.questList.length) html += '<div style="font-size:8px;color:var(--dim);font-family:Cinzel,serif;margin-top:1px">📜 ' + p.questList.join(' · ') + '</div>';
-      if (p.wheelList.length) html += '<div style="font-size:8px;color:var(--dim);font-family:Cinzel,serif">🎰 ' + p.wheelList.join(' · ') + '</div>';
+      if (p.questList.length) html += '<div style="font-size:8px;color:var(--dim);font-family:Cinzel,serif;margin-top:1px">&#128220; ' + p.questList.join(' · ') + '</div>';
+      if (p.wheelList.length) html += '<div style="font-size:8px;color:var(--dim);font-family:Cinzel,serif">&#127920; ' + p.wheelList.join(' · ') + '</div>';
+      if (p.warriorFaab) html += '<div style="font-size:8px;color:var(--gold);font-family:Cinzel,serif">&#128081; Warrior of the Week +$20</div>';
       html += '</div>';
       html += '<div style="font-family:Cinzel,serif;font-size:15px;font-weight:700;color:' + (dimmed?'var(--dim)':'var(--gold)') + ';flex-shrink:0">' + (dimmed ? '$0' : '+$'+total) + '</div>';
       html += '</div>';
@@ -4066,21 +4441,61 @@ function renderCoCommish() {
     html += '</div>';
   }
 
-  // ── ACTION BUTTONS ──────────────────────────────────────────
-  html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">';
+  // ── ACTION BUTTONS — SEQUENTIAL WORKFLOW ────────────────────
+  html += '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">';
 
-  // AI Audit button (step 2)
-  html += '<button onclick="openAuditPanel()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:14px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer">🤖 Run AI Audit</button>';
+  // Step 2: AI Audit
+  html += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+  html += '<span style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:1px;min-width:60px">STEP 2</span>';
+  html += '<button onclick="openAuditPanel()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:14px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer">&#129302; Run AI Audit</button>';
+  html += '</div>';
 
-  // Confirm Payout + Submit Week buttons — only show for active payout week
   if (selWeek === activePayoutWeek && selWeek > submittedWeek) {
-    html += '<button onclick="confirmPayoutStep(' + selWeek + ',' + grandTotal + ')" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:14px;border:1px solid rgba(201,168,76,.5);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer">💰 Confirm Payout — $' + grandTotal + ' FAAB</button>';
-    html += '<button id="submitWeekBtn" onclick="submitPayoutWeek(' + selWeek + ')" style="display:none;font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:14px;border:1px solid rgba(110,222,126,.4);background:rgba(110,222,126,.12);color:#6EDE7E;cursor:pointer">&#10003; Submit Week ' + selWeek + ' &#8594; Advance to Week ' + (selWeek+1) + '</button>';
+    // Step 3: Confirm FAAB Payout
+    html += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+    html += '<span style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:1px;min-width:60px">STEP 3</span>';
+    html += '<button onclick="confirmPayoutStep(' + selWeek + ',' + grandTotal + ')" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:14px;border:1px solid rgba(201,168,76,.5);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer">&#128176; Confirm FAAB Payout — $' + grandTotal + '</button>';
+    html += '<span style="font-family:Cinzel,serif;font-size:9px;color:var(--dim)">Pay these amounts on Sleeper</span>';
+    html += '</div>';
+
+    // Step 4: Pay Warrior of the Week
+    var warriorPaid = localStorage.getItem('warriorPaid_wk' + selWeek) === 'true';
+    html += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap" id="warriorPayStep">';
+    html += '<span style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:1px;min-width:60px">STEP 4</span>';
+    if (weekTitan) {
+      var wtMgr = MANAGERS.find(function(m){ return m.name === weekTitan.name; }) || {};
+      var wtCrest = wtMgr.crest ? BASE + wtMgr.crest : '';
+      html += '<div style="display:flex;align-items:center;gap:10px;background:rgba(201,168,76,.06);border:1px solid ' + (warriorPaid ? 'rgba(110,222,126,.3)' : 'rgba(201,168,76,.3)') + ';border-radius:14px;padding:10px 16px;flex-wrap:wrap">';
+      if (wtCrest) html += '<img src="' + wtCrest + '" style="width:32px;height:32px;object-fit:contain;border-radius:6px">';
+      html += '<div style="flex:1"><div style="font-family:Cinzel,serif;font-size:10px;font-weight:700;color:var(--gold)">&#128081; ' + weekTitan.name + '</div>';
+      html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim)">Warrior of Week ' + selWeek + ' · ' + weekTitan.pts + ' pts · $20 payout on Sleeper</div></div>';
+      if (warriorPaid) {
+        html += '<span style="font-family:Cinzel,serif;font-size:9px;color:#6EDE7E;padding:4px 10px;border-radius:8px;background:rgba(110,222,126,.1);border:1px solid rgba(110,222,126,.2)">&#10003; Paid</span>';
+      } else {
+        html += '<button onclick="confirmWarriorPayout(' + selWeek + ')" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:8px 18px;border-radius:12px;border:1px solid rgba(201,168,76,.5);background:rgba(201,168,76,.15);color:var(--gold);cursor:pointer">&#128081; Pay $20 Warrior Prize</button>';
+      }
+      html += '</div>';
+    } else {
+      html += '<div style="display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.2);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:10px 16px;flex-wrap:wrap">';
+      html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);flex:1">No Warrior crowned yet for Week ' + selWeek + ' — auto-detect from Sleeper matchup scores, then confirm $20 paid.</div>';
+      html += '<button onclick="crownTitan()" style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:7px 16px;border-radius:10px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer">&#9889; Auto-Detect &amp; Crown</button>';
+      html += '</div>';
+    }
+    html += '</div>';
+
+    // Step 5: Submit Week — only unlocked after warrior is paid (or no titan)
+    var canSubmit = warriorPaid || !weekTitan;
+    html += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+    html += '<span style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:1px;min-width:60px">STEP 5</span>';
+    html += '<button id="submitWeekBtn" onclick="submitPayoutWeek(' + selWeek + ')" style="display:' + (canSubmit ? 'inline-flex' : 'none') + ';font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:14px;border:1px solid rgba(110,222,126,.4);background:rgba(110,222,126,.12);color:#6EDE7E;cursor:pointer">&#10003; Submit Week ' + selWeek + ' &#8594; Advance to Week ' + (selWeek+1) + '</button>';
+    if (!canSubmit) html += '<span style="font-family:Cinzel,serif;font-size:9px;color:var(--dim)">Pay Warrior first to unlock</span>';
+    html += '</div>';
+
   } else if (selWeek <= submittedWeek) {
-    html += '<div style="font-family:Cinzel,serif;font-size:9px;color:#6EDE7E;padding:10px 16px;border-radius:14px;border:1px solid rgba(110,222,126,.2);background:rgba(110,222,126,.05)">✓ Week ' + selWeek + ' submitted & paid</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:9px;color:#6EDE7E;padding:10px 16px;border-radius:14px;border:1px solid rgba(110,222,126,.2);background:rgba(110,222,126,.05)">&#10003; Week ' + selWeek + ' fully submitted &amp; paid</div>';
   }
 
-  html += '</div>';
+  html += '</div>'; // end action buttons
 
   // ── AI AUDIT PANEL (hidden by default) ──────────────────────
   html += '<div id="auditPanel" style="display:none;background:rgba(201,168,76,.05);border:1px solid var(--gold-border);border-radius:14px;padding:16px;margin-bottom:16px">';
@@ -4101,7 +4516,7 @@ function renderCoCommish() {
   // ── STEP 5: WEEKLY RECAP ────────────────────────────────────
   html += '<div style="background:rgba(201,168,76,.04);border:1px solid var(--gold-border);border-radius:14px;padding:16px;margin-bottom:20px">';
   html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">';
-  html += '<div class="stitle" style="margin:0">Step 5 — Generate Weekly Recap</div>';
+  html += '<div class="stitle" style="margin:0">Step 6 — Generate Weekly Recap</div>';
   html += '</div>';
   html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-bottom:12px;line-height:1.7">';
   html += 'After paying out FAAB, generate the weekly Chronicle. The recap will include matchup results, quest completions, notable transactions and lore-driven commentary.';
@@ -4223,39 +4638,61 @@ function closeAuditPanel() {
   var panel = document.getElementById('auditPanel');
   if (panel) panel.style.display = 'none';
 }
+function markStepDone(weekNum, stepNum) {
+  try {
+    var key = 'commishSteps_wk' + weekNum;
+    var done = JSON.parse(localStorage.getItem(key) || '[]');
+    if (done.indexOf(stepNum) === -1) { done.push(stepNum); localStorage.setItem(key, JSON.stringify(done)); }
+  } catch(e) {}
+}
+
 function openAuditPanel() {
   var panel = document.getElementById('auditPanel');
   if (panel) { panel.style.display = (panel.style.display === 'none') ? 'block' : 'none'; }
 }
 
+function confirmWarriorPayout(weekNum) {
+  var titanHistory = getTitanHistory();
+  var weekTitan = titanHistory.find(function(t){ return t.week === weekNum; });
+  if (!weekTitan) { alert('No Warrior crowned for Week ' + weekNum); return; }
+  var msg = 'Confirm $20 Warrior of the Week payment on Sleeper:\n\n' + weekTitan.name + ' · ' + weekTitan.pts + ' pts\n\nHave you paid them $20 on Sleeper?';
+  if (!confirm(msg)) return;
+  localStorage.setItem('warriorPaid_wk' + weekNum, 'true');
+  markStepDone(weekNum, 4);
+  renderCoCommish();
+}
+
 function confirmPayoutStep(weekNum, total) {
-  // Build payout breakdown for confirm dialog
   var completions = getQuestCompletions();
   var wheelHistory = getWheelHistory();
+  var titanHistory = getTitanHistory();
+  var weekTitan = titanHistory.find(function(t){ return t.week === weekNum; });
   var lines = [];
   MANAGERS.forEach(function(m) {
-    var questFaab = 0, wheelFaab = 0;
+    var questFaab = 0, wheelFaab = 0, warriorFaab = 0;
     var mc = completions[m.name] || [];
     mc.filter(function(c){ return c.week === weekNum; }).forEach(function(c){ questFaab += c.faab; });
     wheelHistory.filter(function(h){ return h.manager === m.name && h.week === weekNum && h.val > 0; }).forEach(function(h){ wheelFaab += h.val; });
-    var t = questFaab + wheelFaab;
-    if (t > 0) lines.push(m.name.split(' ')[0] + ': +$' + t);
+    if (weekTitan && weekTitan.name === m.name) warriorFaab = 20;
+    var t = questFaab + wheelFaab + warriorFaab;
+    if (t > 0) lines.push(m.name.split(' ')[0] + ': +$' + t + (warriorFaab ? ' (incl. Warrior $20)' : ''));
   });
-  var msg = 'CONFIRM WEEK ' + weekNum + ' PAYOUT\n\n'
+  var msg = 'CONFIRM WEEK ' + weekNum + ' FAAB PAYOUT\n\n'
     + (lines.length ? lines.join('\n') : 'No payouts this week')
     + '\n\nTotal: $' + total + ' FAAB'
     + '\n\nHave you paid out all managers on Sleeper?';
   if (!confirm(msg)) return;
-  // Show submit button
-  var btn = document.getElementById('submitWeekBtn');
-  if (btn) { btn.style.display = 'inline-block'; }
+  markStepDone(weekNum, 3);
+  renderCoCommish();
+  alert('FAAB payout confirmed for Week ' + weekNum + '. Now pay the Warrior of the Week $20 prize on Sleeper.');
 }
 
 function submitPayoutWeek(weekNum) {
   if (!confirm('Confirm: Week ' + weekNum + ' is fully paid out on Sleeper? This will advance to Week ' + (weekNum+1) + '.')) return;
+  markStepDone(weekNum, 5);
   localStorage.setItem('commishSubmittedWeek', weekNum);
   renderCoCommish();
-  alert('✓ Week ' + weekNum + ' submitted. Now tracking Week ' + (weekNum+1) + '.');
+  alert('Week ' + weekNum + ' submitted. Now tracking Week ' + (weekNum+1) + '.');
 }
 
 
@@ -4271,79 +4708,142 @@ function renderRankings() {
     var BASE = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
     var completions = getQuestCompletions();
     var wheelHistory = getWheelHistory();
+    var titanHistory = getTitanHistory();
     var me = getCurrentManager();
+    var curWeek = S.week || 1;
 
-    // Get division wins from Sleeper rosters
-    var divWinsMap = {};
-    S.rosters && S.rosters.forEach(function(r) {
-      var name = resolveTeamName(r, getUser(r.owner_id));
-      // Count wins from stored memory if available
-      var mem = getMemory ? getMemory() : {};
-      divWinsMap[name] = (mem.divWins && mem.divWins[name]) || 0;
-    });
-
-    // Build full stats per manager
+    // Build stats per manager
     var stats = MANAGERS.map(function(m) {
       var mc = completions[m.name] || [];
       var questCount = mc.length;
       var questFaab  = mc.reduce(function(s,c){ return s+c.faab; }, 0);
+      var weekQuestFaab = mc.filter(function(c){ return c.week===curWeek; }).reduce(function(s,c){ return s+c.faab; }, 0);
       var wheelFaab  = wheelHistory.filter(function(h){ return h.manager===m.name&&h.val>0; }).reduce(function(s,h){ return s+h.val; },0);
-      var totalFaab  = questFaab + wheelFaab;
-      var divWins    = divWinsMap[m.name] || 0;
-
-      // Get W/L from Sleeper rosters
-      var roster = S.rosters && S.rosters.find(function(r){
-        var n = resolveTeamName(r, getUser(r.owner_id));
-        return n === m.name;
-      });
-      var wins   = roster && roster.settings ? (roster.settings.wins   || 0) : 0;
-      var losses = roster && roster.settings ? (roster.settings.losses || 0) : 0;
-      var pf     = roster && roster.settings ? ((roster.settings.fpts  || 0) + (roster.settings.fpts_decimal||0)/100) : 0;
-
+      var weekWheelFaab = wheelHistory.filter(function(h){ return h.manager===m.name&&h.week===curWeek&&h.val>0; }).reduce(function(s,h){ return s+h.val; },0);
+      var warriorWins = titanHistory.filter(function(t){ return t.name===m.name; }).length;
+      var totalFaab  = questFaab + wheelFaab + (warriorWins * 20);
+      var weekFaab   = weekQuestFaab + weekWheelFaab;
+      var roster = S.rosters && S.rosters.find(function(r){ return resolveTeamName(r, getUser(r.owner_id))===m.name; });
+      var wins   = roster && roster.settings ? (roster.settings.wins||0) : 0;
+      var losses = roster && roster.settings ? (roster.settings.losses||0) : 0;
       var div = TEAM_DIVISIONS[m.name] || 'north';
       var dc  = DIV_COLORS_SI[div] || '#C9A84C';
       var isMe = me && me.name === m.name;
-      return { m:m, questCount:questCount, questFaab:questFaab, wheelFaab:wheelFaab, totalFaab:totalFaab, divWins:divWins, wins:wins, losses:losses, pf:pf, dc:dc, isMe:isMe };
+      return { m:m, questCount:questCount, questFaab:questFaab, wheelFaab:wheelFaab, warriorWins:warriorWins, totalFaab:totalFaab, weekFaab:weekFaab, wins:wins, losses:losses, div:div, dc:dc, isMe:isMe };
     });
 
-    function makeCard(title, sorted, valFn) {
-      var medals = ['&#127945;','&#129352;','&#129353;'];
-      var h = '<div style="background:rgba(0,0,0,.3);border:1px solid var(--gold-border);border-radius:14px;padding:14px;flex:1;min-width:260px;max-width:340px">';
-      h += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:var(--gold);letter-spacing:1px;margin-bottom:12px;border-bottom:1px solid var(--gold-border);padding-bottom:8px">' + title + '</div>';
-      sorted.forEach(function(s, i) {
-        var crest = s.m.crest ? '<img src="' + BASE + s.m.crest + '" style="width:22px;height:22px;object-fit:contain;border-radius:3px;flex-shrink:0">' : '';
-        var medal = i < 3 ? '<span style="font-size:14px">' + medals[i] + '</span>' : '<span style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);min-width:18px;text-align:center">' + (i+1) + '</span>';
-        h += '<div style="display:flex;align-items:center;gap:7px;padding:5px 4px;border-radius:7px;background:' + (s.isMe?'rgba(201,168,76,.08)':'transparent') + '">';
-        h += medal;
-        h += crest;
-        h += '<div style="flex:1;font-family:Cinzel,serif;font-size:9px;color:' + (s.isMe?'var(--gold)':s.dc) + ';font-weight:' + (s.isMe?'700':'400') + '">' + s.m.name + (s.isMe?' &#10086;':'') + '</div>';
-        h += '<div style="font-family:Cinzel,serif;font-size:12px;font-weight:700;color:var(--gold)">' + valFn(s) + '</div>';
-        h += '</div>';
-      });
-      h += '</div>';
-      return h;
-    }
-
-    var byQuests  = stats.slice().sort(function(a,b){ return b.questCount-a.questCount||b.totalFaab-a.totalFaab; });
-    var byFaab    = stats.slice().sort(function(a,b){ return b.totalFaab-a.totalFaab||b.questCount-a.questCount; });
-
+    var byQuests = stats.slice().sort(function(a,b){ return b.questCount-a.questCount||b.totalFaab-a.totalFaab; });
+    var byFaab   = stats.slice().sort(function(a,b){ return b.totalFaab-a.totalFaab||b.questCount-a.questCount; });
+    var maxFaab  = byFaab[0] ? byFaab[0].totalFaab || 1 : 1;
+    var maxQuest = byQuests[0] ? byQuests[0].questCount || 1 : 1;
     var totalFaabAll   = stats.reduce(function(s,x){return s+x.totalFaab;},0);
     var totalQuestsAll = stats.reduce(function(s,x){return s+x.questCount;},0);
 
-    var html = '<div style="font-family:Cinzel,serif;font-size:22px;font-weight:900;color:var(--gold);letter-spacing:3px;margin-bottom:4px">&#127942; Realm Rankings</div>';
-    html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-bottom:18px;letter-spacing:1px">Season 2 — All 16 Titans</div>';
+    // ── PERSONAL SUMMARY CARDS (profile-dependent) ──
+    var submittedWeek = parseInt(localStorage.getItem('commishSubmittedWeek') || '0');
+    var myCardHtml = '';
+    if (me && me.name) {
+      var myStats = stats.find(function(s){ return s.m.name === me.name; }) || {};
+      var myMc = completions[me.name] || [];
+      var myWheelHistory = wheelHistory.filter(function(h){ return h.manager === me.name; });
+      var owedQuestFaab = myMc.filter(function(c){ return c.week > submittedWeek; }).reduce(function(s,c){ return s+c.faab; }, 0);
+      var owedWheelFaab = myWheelHistory.filter(function(h){ return h.week > submittedWeek && h.val > 0; }).reduce(function(s,h){ return s+h.val; }, 0);
+      var titanHistory = getTitanHistory();
+      var owedWarrior = titanHistory.filter(function(t){ return t.name === me.name && t.week > submittedWeek; }).length * 20;
+      var owedTotal = owedQuestFaab + owedWheelFaab + owedWarrior;
+      var allTimeFaab = (myStats.totalFaab || 0);
+      var mgrInfo = MANAGERS.find(function(x){ return x.name === me.name; }) || {};
+      var div = TEAM_DIVISIONS[me.name] || 'north';
+      var divColor = DIV_COLORS_SI[div] || '#C9A84C';
+      // Quest rank
+      var myQuestRank = byQuests.findIndex(function(s){ return s.m.name === me.name; }) + 1;
+      var myFaabRank  = byFaab.findIndex(function(s){ return s.m.name === me.name; }) + 1;
 
-    // Summary totals
-    html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px">';
-    html += '<div style="background:rgba(201,168,76,.08);border:1px solid var(--gold-border);border-radius:10px;padding:10px 16px;font-family:Cinzel,serif"><div style="font-size:9px;color:var(--dim);letter-spacing:1px">QUESTS COMPLETED</div><div style="font-size:18px;font-weight:700;color:var(--gold)">' + totalQuestsAll + '</div></div>';
-    html += '<div style="background:rgba(201,168,76,.08);border:1px solid var(--gold-border);border-radius:10px;padding:10px 16px;font-family:Cinzel,serif"><div style="font-size:9px;color:var(--dim);letter-spacing:1px">TOTAL FAAB PAID OUT</div><div style="font-size:18px;font-weight:700;color:var(--gold)">$' + totalFaabAll + '</div></div>';
+      myCardHtml  = '<div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">';
+      // Crest — big
+      if (mgrInfo.crest) myCardHtml += '<img src="' + BASE + mgrInfo.crest + '" style="width:72px;height:72px;object-fit:contain;border-radius:12px;border:2px solid var(--gold-border);flex-shrink:0" onerror="this.style.display=\'none\'">';
+      // Name + div
+      myCardHtml += '<div style="flex:1;min-width:120px">';
+      myCardHtml += '<div style="font-family:Cinzel,serif;font-size:18px;font-weight:700;color:var(--gold);margin-bottom:2px">' + me.name + '</div>';
+      myCardHtml += '<div style="font-family:Cinzel,serif;font-size:10px;color:' + divColor + ';letter-spacing:2px;margin-bottom:6px">' + (div.charAt(0).toUpperCase()+div.slice(1)).toUpperCase() + ' DIVISION</div>';
+      myCardHtml += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim)">Quest Rank: <span style="color:var(--gold);font-weight:700">#' + myQuestRank + '</span> &nbsp;·&nbsp; FAAB Rank: <span style="color:var(--gold);font-weight:700">#' + myFaabRank + '</span></div>';
+      myCardHtml += '</div>';
+      // Stat cards
+      myCardHtml += '<div style="display:flex;gap:10px;flex-wrap:wrap">';
+      myCardHtml += '<div style="background:rgba(201,168,76,.1);border:1px solid var(--gold-border);border-radius:12px;padding:14px 22px;font-family:Cinzel,serif;text-align:center;min-width:80px"><div style="font-size:10px;color:var(--dim);letter-spacing:1.5px;margin-bottom:4px">QUESTS</div><div style="font-size:32px;font-weight:700;color:var(--gold);line-height:1">' + (myStats.questCount || 0) + '</div></div>';
+      myCardHtml += '<div style="background:rgba(201,168,76,.08);border:1px solid var(--gold-border);border-radius:12px;padding:14px 22px;font-family:Cinzel,serif;text-align:center;min-width:80px"><div style="font-size:10px;color:var(--dim);letter-spacing:1.5px;margin-bottom:4px">ALL-TIME FAAB</div><div style="font-size:32px;font-weight:700;color:var(--gold);line-height:1">$' + allTimeFaab + '</div></div>';
+      myCardHtml += '<div style="background:rgba(110,222,126,.08);border:1px solid rgba(110,222,126,.3);border-radius:12px;padding:14px 22px;font-family:Cinzel,serif;text-align:center;min-width:80px"><div style="font-size:10px;color:var(--dim);letter-spacing:1.5px;margin-bottom:4px">FAAB OWED</div><div style="font-size:32px;font-weight:700;color:' + (owedTotal > 0 ? '#6EDE7E' : 'var(--dim)') + ';line-height:1">$' + owedTotal + '</div><div style="font-size:9px;color:var(--dim);margin-top:4px">Wks '+(submittedWeek+1)+'–now</div></div>';
+      myCardHtml += '</div></div>';
+
+    } else {
+      myCardHtml  = '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">';
+      myCardHtml += '<div style="font-family:Cinzel,serif;font-size:13px;color:var(--dim)">&#9660; Sign in to see your personal stats &amp; FAAB owed</div>';
+      myCardHtml += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-left:auto">';
+      myCardHtml += '<div style="background:rgba(201,168,76,.1);border:1px solid var(--gold-border);border-radius:10px;padding:10px 18px;font-family:Cinzel,serif;text-align:center"><div style="font-size:10px;color:var(--dim);letter-spacing:1px">LEAGUE QUESTS</div><div style="font-size:24px;font-weight:700;color:var(--gold)">' + totalQuestsAll + '</div></div>';
+      myCardHtml += '<div style="background:rgba(201,168,76,.1);border:1px solid var(--gold-border);border-radius:10px;padding:10px 18px;font-family:Cinzel,serif;text-align:center"><div style="font-size:10px;color:var(--dim);letter-spacing:1px">LEAGUE FAAB OUT</div><div style="font-size:24px;font-weight:700;color:var(--gold)">$' + totalFaabAll + '</div></div>';
+      myCardHtml += '</div></div>';
+    }
+    var medals = ['&#127945;','&#129352;','&#129353;'];
+
+    var html = '';
+
+    // ── HEADER ──
+    html += '<div style="display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">';
+    html += '<div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:22px;font-weight:900;color:var(--gold);letter-spacing:3px">&#127942; Realm Rankings</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);letter-spacing:1px;margin-top:2px">Season 2 · All 16 Titans · Week '+curWeek+'</div>';
+    html += '</div></div>';
+
+    // ── PERSONAL SUMMARY BAR ──
+    html += '<div style="background:linear-gradient(135deg,rgba(201,168,76,.12),rgba(201,168,76,.04));border:1.5px solid rgba(201,168,76,.3);border-radius:16px;padding:20px 24px;margin-bottom:20px">';
+    html += myCardHtml;
     html += '</div>';
 
-    // 4 leaderboard cards
-    html += '<div style="display:flex;gap:12px;flex-wrap:wrap">';
-    html += makeCard('&#128220; Quests Completed', byQuests, function(s){ return s.questCount; });
-    html += makeCard('&#128176; FAAB Earned', byFaab, function(s){ return '$'+s.totalFaab; });
+    // ── TABS ──
+    html += '<div style="display:flex;gap:0;margin-bottom:16px;border:1px solid var(--gold-border);border-radius:10px;overflow:hidden">';
+    html += '<button id="rrTab_quest" onclick="rrSwitch(\'quest\')" style="flex:1;font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:9px 4px;background:var(--gold-dim);color:var(--gold);border:none;cursor:pointer;border-right:1px solid var(--gold-border)">&#128220; QUESTS</button>';
+    html += '<button id="rrTab_faab" onclick="rrSwitch(\'faab\')" style="flex:1;font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:9px 4px;background:transparent;color:var(--dim);border:none;cursor:pointer">&#128176; FAAB EARNED</button>';
+    html += '</div>';
 
+    // ── QUESTS LEADERBOARD ──
+    html += '<div id="rrPanel_quest">';
+    byQuests.forEach(function(s, i) {
+      var barPct = maxQuest > 0 ? Math.max(4, Math.round(s.questCount/maxQuest*100)) : 4;
+      var isTop3 = i < 3;
+      html += '<div style="background:'+(s.isMe?'rgba(201,168,76,.1)':'rgba(0,0,0,.25)')+';border:1px solid '+(s.isMe?'rgba(201,168,76,.4)':'rgba(255,255,255,.05)')+';border-radius:12px;padding:10px 14px;margin-bottom:7px;display:flex;align-items:center;gap:12px">';
+      // Rank
+      html += '<div style="font-family:Cinzel,serif;font-size:'+(isTop3?'18':'13')+'px;font-weight:700;min-width:26px;text-align:center;color:'+(isTop3?s.dc:'var(--dim)')+'">'+(isTop3?medals[i]:(i+1))+'</div>';
+      // Crest
+      if (s.m.crest) html += '<img src="'+BASE+s.m.crest+'" style="width:40px;height:40px;object-fit:contain;border-radius:7px;flex-shrink:0" onerror="this.style.display=\'none\'">';
+      // Name + bar
+      html += '<div style="flex:1;min-width:0">';
+      html += '<div style="font-family:Cinzel,serif;font-size:12px;font-weight:700;color:'+(s.isMe?'var(--gold)':s.dc)+';margin-bottom:4px">' + s.m.name + (s.isMe?' &#10086;':'') + '</div>';
+      html += '<div style="background:rgba(255,255,255,.06);border-radius:4px;height:5px;overflow:hidden"><div style="height:100%;background:'+s.dc+';border-radius:4px;width:'+barPct+'%;transition:width .6s ease"></div></div>';
+      html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);margin-top:3px">'+s.wins+'-'+s.losses+' · '+s.div.charAt(0).toUpperCase()+s.div.slice(1)+(s.warriorWins?' · &#128081;×'+s.warriorWins:'')+'</div>';
+      html += '</div>';
+      // Quest count
+      html += '<div style="text-align:right;flex-shrink:0"><div style="font-family:Cinzel,serif;font-size:22px;font-weight:700;color:var(--gold)">'+s.questCount+'</div><div style="font-family:Cinzel,serif;font-size:8px;letter-spacing:1px;color:var(--dim)">QUESTS</div></div>';
+      html += '</div>';
+    });
+    html += '</div>';
+
+    // ── FAAB LEADERBOARD (hidden by default) ──
+    html += '<div id="rrPanel_faab" style="display:none">';
+    byFaab.forEach(function(s, i) {
+      var barPct = maxFaab > 0 ? Math.max(4, Math.round(s.totalFaab/maxFaab*100)) : 4;
+      var isTop3 = i < 3;
+      html += '<div style="background:'+(s.isMe?'rgba(201,168,76,.1)':'rgba(0,0,0,.25)')+';border:1px solid '+(s.isMe?'rgba(201,168,76,.4)':'rgba(255,255,255,.05)')+';border-radius:12px;padding:10px 14px;margin-bottom:7px;display:flex;align-items:center;gap:12px">';
+      html += '<div style="font-family:Cinzel,serif;font-size:'+(isTop3?'18':'13')+'px;font-weight:700;min-width:26px;text-align:center;color:'+(isTop3?s.dc:'var(--dim)')+'">'+(isTop3?medals[i]:(i+1))+'</div>';
+      if (s.m.crest) html += '<img src="'+BASE+s.m.crest+'" style="width:40px;height:40px;object-fit:contain;border-radius:7px;flex-shrink:0" onerror="this.style.display=\'none\'">';
+      html += '<div style="flex:1;min-width:0">';
+      html += '<div style="font-family:Cinzel,serif;font-size:12px;font-weight:700;color:'+(s.isMe?'var(--gold)':s.dc)+';margin-bottom:4px">' + s.m.name + (s.isMe?' &#10086;':'') + '</div>';
+      html += '<div style="background:rgba(255,255,255,.06);border-radius:4px;height:5px;overflow:hidden"><div style="height:100%;background:'+s.dc+';border-radius:4px;width:'+barPct+'%;transition:width .6s ease"></div></div>';
+      var breakdown = 'Quests $'+s.questFaab+' · Wheel $'+s.wheelFaab+(s.warriorWins?' · Warrior $'+(s.warriorWins*20):'');
+      html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);margin-top:3px">'+breakdown+'</div>';
+      html += '</div>';
+      html += '<div style="text-align:right;flex-shrink:0"><div style="font-family:Cinzel,serif;font-size:22px;font-weight:700;color:var(--gold)">$'+s.totalFaab+'</div><div style="font-family:Cinzel,serif;font-size:8px;letter-spacing:1px;color:var(--dim)">FAAB</div></div>';
+      html += '</div>';
+    });
     html += '</div>';
 
     wrap.innerHTML = html;
@@ -4352,6 +4852,19 @@ function renderRankings() {
     console.error('renderRankings error:', err);
     wrap.innerHTML = '<div style="color:#FF6B6B;font-family:Cinzel,serif;padding:20px">Error: ' + err.message + '</div>';
   }
+}
+
+function rrSwitch(tab) {
+  var qPanel = document.getElementById('rrPanel_quest');
+  var fPanel = document.getElementById('rrPanel_faab');
+  var qBtn   = document.getElementById('rrTab_quest');
+  var fBtn   = document.getElementById('rrTab_faab');
+  if (!qPanel || !fPanel) return;
+  var isQuest = tab === 'quest';
+  qPanel.style.display = isQuest ? 'block' : 'none';
+  fPanel.style.display = isQuest ? 'none' : 'block';
+  if (qBtn) { qBtn.style.background = isQuest ? 'var(--gold-dim)' : 'transparent'; qBtn.style.color = isQuest ? 'var(--gold)' : 'var(--dim)'; }
+  if (fBtn) { fBtn.style.background = isQuest ? 'transparent' : 'var(--gold-dim)'; fBtn.style.color = isQuest ? 'var(--dim)' : 'var(--gold)'; }
 }
 
 
@@ -4401,39 +4914,92 @@ function renderQuestLeaderboard() {
 
 function openWeeklyPayout() {
   var week = S.week || 1;
-  var summary = getWeeklyPayoutSummary(week);
+  var me = getCurrentManager();
   var BASE = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
 
-  var html = '<div style="font-family:Cinzel,serif;font-size:14px;font-weight:700;color:var(--gold);text-align:center;margin-bottom:16px;letter-spacing:2px">💰 Week ' + week + ' Quest Payouts</div>';
+  // If signed in as non-commish: show only their own payout history
+  // If signed in as commish or not signed in: show all
+  var isCommish = me && me.name === 'Heir of Zeus';
+  var showAll = !me || isCommish;
 
-  if (!Object.keys(summary).length) {
-    html += '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--dim);text-align:center;padding:20px">No quest completions recorded for Week ' + week + ' yet.<br>Run the Co-Commish Audit first.</div>';
-  } else {
+  var html = '';
+
+  if (!me) {
+    // Not signed in
+    html += '<div style="font-family:Cinzel,serif;font-size:14px;font-weight:700;color:var(--gold);text-align:center;margin-bottom:16px;letter-spacing:2px">&#128176; Weekly Quest Payouts</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--dim);text-align:center;padding:20px">Sign in as your team to see your personal payout history.</div>';
+
+  } else if (!isCommish) {
+    // Regular manager — show their own earnings per week
+    var completions = getQuestCompletions();
+    var wheelHistory = getWheelHistory();
+    var titanHistory = getTitanHistory();
+    var submittedWeek = parseInt(localStorage.getItem('commishSubmittedWeek') || '0');
+    var mgr = MANAGERS.find(function(m){ return m.name === me.name; }) || {};
+    var divColor = DIV_COLORS_SI[TEAM_DIVISIONS[me.name]||'north'] || '#C9A84C';
+    var mc = completions[me.name] || [];
     var grandTotal = 0;
-    Object.keys(summary).sort(function(a,b){ return summary[b].total - summary[a].total; }).forEach(function(name) {
-      var t = summary[name];
-      var mgr = MANAGERS.find(function(m){ return m.name === name; });
-      var crestUrl = mgr && mgr.crest ? BASE + mgr.crest : '';
-      var divColor = mgr ? (DIV_COLORS_SI[TEAM_DIVISIONS[mgr.name]||'north']||'#C9A84C') : '#C9A84C';
-      grandTotal += t.total;
-      html += '<div style="background:rgba(0,0,0,.3);border:1px solid var(--gold-border);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">';
-      if (crestUrl) html += '<img src="' + crestUrl + '" style="width:32px;height:32px;object-fit:contain;border-radius:6px">';
-      html += '<div style="flex:1">';
-      html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:' + divColor + '">' + name + '</div>';
-      t.completions.forEach(function(c) {
-        html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim)">' + c.questTitle + ' · $' + c.faab + '</div>';
+
+    html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">';
+    if (mgr.crest) html += '<img src="' + BASE + mgr.crest + '" style="width:44px;height:44px;object-fit:contain;border-radius:8px">';
+    html += '<div><div style="font-family:Cinzel,serif;font-size:15px;font-weight:700;color:var(--gold)">' + me.name + '</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:1px">YOUR FAAB EARNINGS BY WEEK</div></div></div>';
+
+    var maxWeek = S.week || 1;
+    var hasAny = false;
+    for (var w = 1; w <= maxWeek; w++) {
+      var wQuests = mc.filter(function(c){ return c.week === w; });
+      var wWheel  = wheelHistory.filter(function(h){ return h.manager === me.name && h.week === w && h.val > 0; });
+      var wWarrior = titanHistory.filter(function(t){ return t.name === me.name && t.week === w; }).length * 20;
+      var wTotal = wQuests.reduce(function(s,c){ return s+c.faab; },0) + wWheel.reduce(function(s,h){ return s+h.val; },0) + wWarrior;
+      if (wTotal === 0 && w < maxWeek) continue; // skip empty past weeks
+      hasAny = true;
+      grandTotal += wTotal;
+      var isPaid = w <= submittedWeek;
+      html += '<div style="background:rgba(0,0,0,.3);border:1px solid ' + (isPaid?'rgba(110,222,126,.2)':'var(--gold-border)') + ';border-radius:10px;padding:10px 14px;margin-bottom:8px">';
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:' + (wQuests.length||wWheel.length||wWarrior?'8px':'0') + '">';
+      html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:var(--gold)">Week ' + w + '</div>';
+      html += '<div style="display:flex;align-items:center;gap:8px">';
+      if (isPaid) html += '<span style="font-family:Cinzel,serif;font-size:8px;color:#6EDE7E;background:rgba(110,222,126,.1);padding:2px 7px;border-radius:6px;letter-spacing:1px">&#10003; PAID</span>';
+      else html += '<span style="font-family:Cinzel,serif;font-size:8px;color:#FFB347;background:rgba(255,179,71,.1);padding:2px 7px;border-radius:6px;letter-spacing:1px">PENDING</span>';
+      html += '<div style="font-family:Cinzel,serif;font-size:16px;font-weight:700;color:' + (wTotal>0?'var(--gold)':'var(--dim)') + '">+$' + wTotal + '</div>';
+      html += '</div></div>';
+      wQuests.forEach(function(c){ html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);padding:1px 0">&#128220; ' + c.questTitle + ' · <span style="color:var(--gold)">+$' + c.faab + '</span></div>'; });
+      wWheel.forEach(function(h){ html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);padding:1px 0">&#127920; Wheel spin · <span style="color:var(--gold)">+$' + h.val + '</span></div>'; });
+      if (wWarrior) html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);padding:1px 0">&#128081; Warrior of the Week · <span style="color:var(--gold)">+$' + wWarrior + '</span></div>';
+      html += '</div>';
+    }
+    if (!hasAny) html += '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--dim);text-align:center;padding:20px">No earnings recorded yet. Complete quests and spin the wheel!</div>';
+    html += '<div style="text-align:center;font-family:Cinzel,serif;font-size:12px;color:var(--dim);margin-top:12px;border-top:1px solid var(--gold-border);padding-top:12px">Season total: <span style="color:var(--gold);font-weight:700;font-size:16px">$' + grandTotal + ' FAAB</span></div>';
+
+  } else {
+    // Commish — show all managers this week (original behavior)
+    var summary = getWeeklyPayoutSummary(week);
+    html += '<div style="font-family:Cinzel,serif;font-size:14px;font-weight:700;color:var(--gold);text-align:center;margin-bottom:16px;letter-spacing:2px">&#128176; Week ' + week + ' Quest Payouts</div>';
+    if (!Object.keys(summary).length) {
+      html += '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--dim);text-align:center;padding:20px">No quest completions for Week ' + week + ' yet.</div>';
+    } else {
+      var grandTotal2 = 0;
+      Object.keys(summary).sort(function(a,b){ return summary[b].total - summary[a].total; }).forEach(function(name) {
+        var t = summary[name];
+        var mgr2 = MANAGERS.find(function(m){ return m.name === name; });
+        var crestUrl = mgr2 && mgr2.crest ? BASE + mgr2.crest : '';
+        var divColor2 = mgr2 ? (DIV_COLORS_SI[TEAM_DIVISIONS[mgr2.name]||'north']||'#C9A84C') : '#C9A84C';
+        grandTotal2 += t.total;
+        html += '<div style="background:rgba(0,0,0,.3);border:1px solid var(--gold-border);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">';
+        if (crestUrl) html += '<img src="' + crestUrl + '" style="width:32px;height:32px;object-fit:contain;border-radius:6px">';
+        html += '<div style="flex:1"><div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:' + divColor2 + '">' + name + '</div>';
+        t.completions.forEach(function(c){ html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim)">' + c.questTitle + ' · $' + c.faab + '</div>'; });
+        html += '</div><div style="font-family:Cinzel,serif;font-size:16px;font-weight:700;color:var(--gold)">+$' + t.total + '</div></div>';
       });
-      html += '</div>';
-      html += '<div style="font-family:Cinzel,serif;font-size:16px;font-weight:700;color:var(--gold)">+$' + t.total + '</div>';
-      html += '</div>';
-    });
-    html += '<div style="text-align:center;font-family:Cinzel,serif;font-size:12px;color:var(--dim);margin-top:12px">Total this week: <span style="color:var(--gold);font-weight:700;font-size:14px">$' + grandTotal + ' FAAB</span></div>';
+      html += '<div style="text-align:center;font-family:Cinzel,serif;font-size:12px;color:var(--dim);margin-top:12px">Total: <span style="color:var(--gold);font-weight:700;font-size:14px">$' + grandTotal2 + ' FAAB</span></div>';
+    }
   }
 
-  html += '<div style="text-align:center;margin-top:16px"><button onclick="document.getElementById(\'payoutOverlay\').style.display=\'none\'" style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);background:none;border:none;cursor:pointer;letter-spacing:1px">✕ Close</button></div>';
+  html += '<div style="text-align:center;margin-top:16px"><button onclick="document.getElementById(\'payoutOverlay\').style.display=\'none\'" style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);background:none;border:none;cursor:pointer;letter-spacing:1px">&#10005; Close</button></div>';
 
   var overlay = document.getElementById('payoutOverlay');
-  var inner = document.getElementById('payoutInner');
+  var inner   = document.getElementById('payoutInner');
   if (overlay && inner) { inner.innerHTML = html; overlay.style.display = 'flex'; }
 }
 
