@@ -254,12 +254,13 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
   <button class="nb"     onclick="showTab('power',this)">👑 Power Rankings</button>
   <button class="nb"     onclick="showTab('realmmap',this)">🗺 Realm Map</button>
   <button class="nb"     onclick="showTab('wheel',this)">🎰 Daily Wheel</button>
-  <button class="nb"     onclick="showTab('recap',this)">📜 Recap</button>
+  <button class="nb"     onclick="showTab('rankings',this)">&#127942; Realm Rankings</button>
+  <button class="nb"     onclick="showTab('recap',this)">&#128220; Recap</button>
   <button class="nb" id="cocommishNavBtn" style="display:none;margin-left:auto" onclick="openCommishPin(this)">⚔ Co-Commish</button>
 </nav>
 
 <div class="main">
-  <div class="sec on" id="sec-standings"><div class="stitle">Division Standings — Season 2</div><div class="sg" id="sgrid"><p style="color:var(--dim);font-family:Cinzel,serif;font-size:11px">Loading...</p></div></div>
+  <div class="sec on" id="sec-standings"><div class="stitle">Division Standings — Season 2</div><div class="sg" id="sgrid"><p style="color:var(--dim);font-family:Cinzel,serif;font-size:11px">Loading...</p></div><div id="standings-extras"></div></div>
   <div class="sec" id="sec-rosters"><div class="stitle">Team Rosters</div><div class="rsel" id="rsel"></div><div class="rd" id="rdisplay"><p style="padding:2rem;text-align:center;color:var(--dim);font-family:Cinzel,serif;font-size:11px">Select a team above</p></div></div>
   <div class="sec" id="sec-matchups"><div class="stitle">Weekly Matchups</div><div id="mwrap"></div></div>
   <div class="sec" id="sec-transactions"><div class="stitle">Recent Transactions</div><div class="txl" id="txlist"></div></div>
@@ -272,6 +273,7 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
     <div class="stitle">👑 Dynasty Power Rankings</div>
     <div id="powerwrap"></div>
   </div>
+  <div class="sec" id="sec-rankings"><div id="rankingswrap"></div></div>
   <div class="sec" id="sec-cocommish"><div id="cocommishwrap"></div></div>
   <div class="sec" id="sec-quests"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px"><div class="stitle" style="margin:0">🗡 Quest Board</div><button onclick="openWeeklyPayout()" style="font-family:Cinzel,serif;font-size:9px;font-weight:700;letter-spacing:1px;padding:6px 14px;border-radius:16px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer">💰 Weekly Payout</button></div><div id="questswrap"></div></div>
   <div class="sec" id="sec-realmmap"><div class="stitle">🗺 The Realm Map</div><div id="realmwrap"></div></div>
@@ -734,6 +736,165 @@ function renderStandings() {
     });
     grid.appendChild(block);
   });
+  renderStandingsExtras();
+}
+
+// ── STANDINGS EXTRAS ─────────────────────────────────────────
+function renderStandingsExtras() {
+  var wrap = document.getElementById('standings-extras');
+  if (!wrap) return;
+  var BASE = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
+
+  // Build all team stats
+  var allTeams = S.rosters.map(function(r) {
+    var u = getUser(r.owner_id);
+    var name = resolveTeamName(r, u);
+    var w = (r.settings && r.settings.wins) || 0;
+    var l = (r.settings && r.settings.losses) || 0;
+    var pf = (r.settings && r.settings.fpts) || 0;
+    var did = (r.settings && r.settings.division) || 1;
+    var info = DIVMAP[did] || {name:'Division '+did, color:'#C9A84C'};
+    var mgr = MANAGERS.find(function(m){ return m.name === name; })
+      || MANAGERS.find(function(m){ 
+           var mFirst = m.name.split(' ')[0].replace(/'/g,'');
+           var nFirst = name.split(' ')[0].replace(/'/g,'');
+           return mFirst === nFirst || name.indexOf(mFirst) !== -1 || m.name.indexOf(nFirst) !== -1;
+         });
+    // Use mgr name if found (ensures exact match for crests)
+    var displayName = mgr ? mgr.name : name;
+    return { name:displayName, w:w, l:l, pf:pf, did:did, divName:info.name, divColor:info.color, mgr:mgr };
+  }).sort(function(a,b){ return b.w-a.w||b.pf-a.pf; });
+
+  // Get division leaders (top of each division)
+  var divLeaders = {};
+  [1,2,3,4].forEach(function(d) {
+    var divTeams = allTeams.filter(function(t){ return t.did===d; });
+    if (divTeams.length) divLeaders[d] = divTeams[0];
+  });
+  var leaderNames = Object.values(divLeaders).map(function(t){ return t.name; });
+
+  // Wild card = non-division-leaders sorted by record
+  var wildcard = allTeams.filter(function(t){ return leaderNames.indexOf(t.name)===-1; }).slice(0,4);
+  var inHunt = allTeams.filter(function(t){ return leaderNames.indexOf(t.name)===-1; }).slice(4,8);
+
+  var week = S.week || 1;
+  var playoffWeek = 15; // playoff starts week 15 typically
+  var showPlayoffs = week >= 8; // show from midseason onwards
+
+  var html = '';
+
+  // ── OVERALL RECORD + DIVISION WINS SIDE BY SIDE ─────────────
+  html += '<div class="stitle" style="margin-top:24px">&#127942; League Tables</div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">';
+
+  // ── LEFT: Overall Record ──────────────────────────────────
+  html += '<div style="background:rgba(0,0,0,.25);border:1px solid var(--gold-border);border-radius:14px;overflow:hidden">';
+  html += '<div style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:Cinzel,serif;font-size:10px;font-weight:700;color:var(--gold);letter-spacing:1px">&#9876; Overall Record</div>';
+  html += '<div style="display:grid;grid-template-columns:20px 1fr 28px 28px 50px;gap:0;padding:6px 12px;font-family:Cinzel,serif;font-size:8px;color:var(--dim);letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,.04)">';
+  html += '<div></div><div>TEAM</div><div style="text-align:center">W</div><div style="text-align:center">L</div><div style="text-align:right">PF</div></div>';
+  allTeams.forEach(function(t, i) {
+    var crest = t.mgr && t.mgr.crest ? '<img src="' + BASE + t.mgr.crest + '" style="width:18px;height:18px;object-fit:contain;border-radius:3px;flex-shrink:0">' : '';
+    var isLeader = leaderNames.indexOf(t.name) !== -1;
+    var me = getCurrentManager() && getCurrentManager().name === t.name;
+    html += '<div style="display:grid;grid-template-columns:20px 1fr 28px 28px 50px;gap:0;padding:6px 12px;align-items:center;background:' + (me?'rgba(201,168,76,.08)':'transparent') + ';border-bottom:1px solid rgba(255,255,255,.03)">';
+    html += '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim)">' + (i+1) + '</div>';
+    html += '<div style="display:flex;align-items:center;gap:5px;min-width:0">' + crest + '<div style="font-family:Cinzel,serif;font-size:9px;color:' + (me?'var(--gold)':t.divColor) + ';font-weight:' + (me?'700':'400') + ';line-height:1.3">' + t.name + (isLeader?' &#9670;':'') + '</div></div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:#6EDE7E;text-align:center">' + t.w + '</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);text-align:center">' + t.l + '</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);text-align:right">' + t.pf.toFixed(1) + '</div>';
+    html += '</div>';
+  });
+  html += '<div style="padding:6px 12px;font-family:Cinzel,serif;font-size:8px;color:var(--dim)">&#9670; Division leader</div>';
+  html += '</div>';
+
+  // ── RIGHT: Division Wins ───────────────────────────────────
+  // Count division wins from matchup history in memory
+  var mem = (typeof getMemory === 'function') ? getMemory() : {};
+  var divWinCounts = mem.divWins || {};
+
+  var byDivWins = allTeams.slice().sort(function(a,b){
+    var dA = divWinCounts[a.name] || 0;
+    var dB = divWinCounts[b.name] || 0;
+    return dB - dA || b.w - a.w;
+  });
+
+  html += '<div style="background:rgba(0,0,0,.25);border:1px solid var(--gold-border);border-radius:14px;overflow:hidden">';
+  html += '<div style="padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-family:Cinzel,serif;font-size:10px;font-weight:700;color:var(--gold);letter-spacing:1px">&#9876; Division Wins</div>';
+  html += '<div style="display:grid;grid-template-columns:20px 1fr 40px 40px;gap:0;padding:6px 12px;font-family:Cinzel,serif;font-size:8px;color:var(--dim);letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,.04)">';
+  html += '<div></div><div>TEAM</div><div style="text-align:center">DIV W</div><div style="text-align:center">DIV L</div></div>';
+  byDivWins.forEach(function(t, i) {
+    var crest = t.mgr && t.mgr.crest ? '<img src="' + BASE + t.mgr.crest + '" style="width:18px;height:18px;object-fit:contain;border-radius:3px;flex-shrink:0">' : '';
+    var me = getCurrentManager() && getCurrentManager().name === t.name;
+    var dw = divWinCounts[t.name] || 0;
+    var dl = 3 - dw; // 3 total div opponents (some may not be played yet)
+    var maxDivGames = 6; // full season div games
+    var pct = maxDivGames > 0 ? Math.round((dw/maxDivGames)*100) : 0;
+    html += '<div style="display:grid;grid-template-columns:20px 1fr 40px 40px;gap:0;padding:6px 12px;align-items:center;background:' + (me?'rgba(201,168,76,.08)':'transparent') + ';border-bottom:1px solid rgba(255,255,255,.03)">';
+    html += '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim)">' + (i+1) + '</div>';
+    html += '<div style="display:flex;align-items:center;gap:5px;min-width:0">' + crest + '<div style="font-family:Cinzel,serif;font-size:9px;color:' + (me?'var(--gold)':t.divColor) + ';font-weight:' + (me?'700':'400') + ';white-space:nowrap;overflow:hidden;line-height:1.3">' + t.name + '</div></div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:#6EDE7E;text-align:center">' + dw + '</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);text-align:center">' + (t.l > 0 ? t.l : 0) + '</div>';
+    html += '</div>';
+  });
+  html += '<div style="padding:6px 12px;font-family:Cinzel,serif;font-size:8px;color:var(--dim)">Max 6 division games per season</div>';
+  html += '</div>';
+
+  html += '</div>'; // end grid
+
+  // ── PLAYOFF PICTURE ──────────────────────────────────────
+  if (showPlayoffs) {
+    html += '<div class="stitle" style="margin-top:8px">&#127937; Playoff Picture</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px">';
+
+    function playoffCard(t, label, sublabel, badgeColor) {
+      if (!t) return '';
+      var crest = t.mgr && t.mgr.crest ? BASE + t.mgr.crest : '';
+      var me = getCurrentManager() && getCurrentManager().name === t.name;
+      var c = '<div style="background:rgba(0,0,0,.3);border:1px solid ' + (me?'var(--gold)':badgeColor) + ';border-radius:12px;padding:12px;text-align:center">';
+      c += '<div style="font-family:Cinzel,serif;font-size:7px;color:' + badgeColor + ';letter-spacing:2px;font-weight:700;margin-bottom:8px">' + label + '</div>';
+      if (crest) c += '<img src="' + crest + '" style="width:48px;height:48px;object-fit:contain;border-radius:8px;margin-bottom:6px">';
+      c += '<div style="font-family:Cinzel,serif;font-size:9px;color:' + (me?'var(--gold)':t.divColor) + ';font-weight:700">' + t.name + '</div>';
+      c += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim)">' + t.w + '-' + t.l + '</div>';
+      if (sublabel) c += '<div style="font-family:Cinzel,serif;font-size:7px;color:' + badgeColor + ';margin-top:4px;letter-spacing:1px">' + sublabel + '</div>';
+      c += '</div>';
+      return c;
+    }
+
+    // Division leaders column
+    html += '<div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--gold);letter-spacing:2px;margin-bottom:8px">DIVISION LEADERS</div>';
+    Object.values(divLeaders).forEach(function(t) {
+      html += playoffCard(t, t.divName.split(' ')[0].toUpperCase(), 'Clinch Target', 'rgba(201,168,76,.8)');
+      html += '<div style="height:8px"></div>';
+    });
+    html += '</div>';
+
+    // Wild card column
+    html += '<div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:8px;color:#7BB8E8;letter-spacing:2px;margin-bottom:8px">WILD CARD</div>';
+    wildcard.forEach(function(t) {
+      html += playoffCard(t, 'WILD CARD', null, 'rgba(123,184,232,.8)');
+      html += '<div style="height:8px"></div>';
+    });
+    html += '</div>';
+
+    // In the hunt column
+    html += '<div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim);letter-spacing:2px;margin-bottom:8px">IN THE HUNT</div>';
+    inHunt.forEach(function(t) {
+      html += playoffCard(t, 'IN THE HUNT', null, 'rgba(136,153,170,.6)');
+      html += '<div style="height:8px"></div>';
+    });
+    html += '</div>';
+
+    html += '</div>';
+  } else {
+    html += '<div style="background:rgba(0,0,0,.2);border:1px solid var(--gold-border);border-radius:12px;padding:16px;text-align:center;margin-bottom:20px">';
+    html += '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--dim)">&#127937; Playoff Picture unlocks at Week 8</div>';
+    html += '</div>';
+  }
+
+  wrap.innerHTML = html;
 }
 
 // ── ROSTERS ───────────────────────────────────────────────────
@@ -2218,35 +2379,7 @@ function resetTerritory() {
 
 var WEEK1_RESULTS = [{"winner": "IceMonkey", "loser": "Fenrir's Fury"}, {"winner": "Lord of Dreams", "loser": "Notchotaur"}, {"winner": "ChatG-TDs", "loser": "Son of Rander"}, {"winner": "Stefanos the Spartan King", "loser": "Hermes Hail Marys"}, {"winner": "Warrior Shohei Goatani", "loser": "Heir of Zeus"}, {"winner": "Talon", "loser": "Beercules the Destroyer"}, {"winner": "Wrath of Moctezuma", "loser": "Orion Leaf"}, {"winner": "Dewie Slayer of Bakunawa", "loser": "Lord Jefita Clapper"}];
 
-function previewWeek1() {
-  var ownership = initHexOwnership();
-  WEEK1_RESULTS.forEach(function(m) {
-    var winner = m.winner, loser = m.loser;
-    var loserHexes = HEX_DATA.filter(function(h){
-      return ownership[h.id] === loser && !h.home && h.div !== 'center';
-    });
-    if (!loserHexes.length) return;
-    var winnerHexes = HEX_DATA.filter(function(h){ return ownership[h.id] === winner; });
-    if (!winnerHexes.length) return;
-    var best = null, bestDist = 9999;
-    loserHexes.forEach(function(lh) {
-      winnerHexes.forEach(function(wh) {
-        var d = Math.sqrt(Math.pow(lh.x-wh.x,2)+Math.pow(lh.y-wh.y,2));
-        if (d < bestDist) { bestDist = d; best = lh; }
-      });
-    });
-    if (best) ownership[best.id] = winner;
-  });
-  saveHexOwnership(ownership);
-  localStorage.setItem('hexVisible','true');
-  renderRealmMap();
-}
 
-function resetTerritory() {
-  localStorage.removeItem('hexOwnership');
-  localStorage.setItem('hexVisible','false');
-  renderRealmMap();
-}
 
 function toggleHexLayer() {
   var current = localStorage.getItem('hexVisible') !== 'false';
@@ -2785,6 +2918,7 @@ function showTab(tab, btn) {
   if (btn) btn.classList.add('on');
   // Re-render wheel fresh each time tab is opened so spin state reflects current manager
   if (tab === 'wheel') setTimeout(renderWheel, 50);
+  if (tab === 'rankings') setTimeout(renderRankings, 50);
 }
 
 // ── API ───────────────────────────────────────────────────────
@@ -3347,8 +3481,17 @@ function submitPin() {
   if (pin === '0822') {
     _commishUnlocked = true;
     document.getElementById('pinOverlay').style.display = 'none';
-    showTab('cocommish', _pendingCommishBtn);
-    setTimeout(renderCoCommish, 100);
+    // Show cocommish section directly
+    document.querySelectorAll('.sec').forEach(function(s){s.classList.remove('on');});
+    document.querySelectorAll('.nb').forEach(function(b){b.classList.remove('on');});
+    var sec = document.getElementById('sec-cocommish');
+    if (sec) sec.classList.add('on');
+    var btn = document.getElementById('cocommishNavBtn');
+    if (btn) btn.classList.add('on');
+    // Inject loading state immediately so tab isn't blank
+    var wrap = document.getElementById('cocommishwrap');
+    if (wrap) wrap.innerHTML = '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--dim);padding:40px;text-align:center">⏳ Loading Commissioner Dashboard...</div>';
+    setTimeout(function() { try { renderCoCommish(); } catch(e) { console.error(e); } }, 300);
   } else {
     document.getElementById('pinError').textContent = '✕ Incorrect PIN';
     document.getElementById('pinInput').value = '';
@@ -3425,7 +3568,7 @@ function showEpicLoading(m) {
   },800);
   setTimeout(function(){
     screen.style.transition='opacity 0.7s ease'; screen.style.opacity='0';
-    setTimeout(function(){screen.style.display='none';screen.style.opacity='1';screen.style.transition='';if(!_pendingCommishBtn){var t=document.querySelector('.nb');if(t)t.click();}},700);
+    setTimeout(function(){screen.style.display='none';screen.style.opacity='1';screen.style.transition='';var t=document.querySelector('.nb');if(t)t.click();},700);
   },3200);
 }
 document.addEventListener('DOMContentLoaded',function(){
@@ -3542,20 +3685,7 @@ function commishPINCheck() {
   setTimeout(function(){ document.getElementById('pinInput').focus(); }, 100);
 }
 
-function submitCommishPIN() {
-  var pin = document.getElementById('pinInput').value;
-  if (pin === '0822') {
-    _commishUnlocked = true;
-    document.getElementById('pinOverlay').style.display = 'none';
-    var week = parseInt(document.getElementById('auditWeekSel').value);
-    runWeeklyQuestAudit(week);
-  } else {
-    document.getElementById('pinError').textContent = '✕ Incorrect PIN';
-    document.getElementById('pinInput').value = '';
-    document.getElementById('pinInput').focus();
-    setTimeout(function(){ document.getElementById('pinError').textContent = ''; }, 2000);
-  }
-}
+function submitCommishPIN() { submitPin(); }
 
 async function runWeeklyQuestAudit(weekNum) {
   var btn = document.getElementById('auditBtn');
@@ -3833,12 +3963,13 @@ function renderPayoutSummary(approved) {
 // ── RENDER CO-COMMISH TAB ────────────────────────────────────
 function renderCoCommish() {
   var wrap = document.getElementById('cocommishwrap');
-  if (!wrap) return;
+  if (!wrap) { console.error('cocommishwrap not found'); return; }
   if (!S || !S.rosters) {
     wrap.innerHTML = '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--dim);padding:20px;text-align:center">⏳ Loading league data...</div>';
     setTimeout(renderCoCommish, 800);
     return;
   }
+  try {
 
   var week = S.week || 1;
   var BASE = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
@@ -3913,21 +4044,21 @@ function renderCoCommish() {
   } else {
     html += '<div style="margin-bottom:12px">';
     MANAGERS.forEach(function(m) {
-      var p = payouts[m.name];
+      var p = payouts[m.name] || { questFaab:0, wheelFaab:0, questList:[], wheelList:[] };
       var total = p.questFaab + p.wheelFaab;
-      if (!total) return;
       grandTotal += total;
+      var dimmed = total === 0;
       var div = TEAM_DIVISIONS[m.name] || 'north';
-      var dc = DIV_COLORS_SI[div] || '#C9A84C';
+      var dc = dimmed ? 'var(--dim)' : (DIV_COLORS_SI[div] || '#C9A84C');
       var crestUrl = m.crest ? BASE + m.crest : '';
-      html += '<div style="background:rgba(0,0,0,.25);border:1px solid rgba(201,168,76,.15);border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px">';
+      html += '<div style="background:' + (dimmed?'rgba(0,0,0,.1)':'rgba(0,0,0,.25)') + ';border:1px solid ' + (dimmed?'rgba(255,255,255,.05)':'rgba(201,168,76,.15)') + ';border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;opacity:' + (dimmed?'0.4':'1') + '">';
       if (crestUrl) html += '<img src="' + crestUrl + '" style="width:28px;height:28px;object-fit:contain;border-radius:4px;flex-shrink:0">';
       html += '<div style="flex:1;min-width:0">';
       html += '<div style="font-family:Cinzel,serif;font-size:10px;font-weight:700;color:' + dc + '">' + m.name + '</div>';
       if (p.questList.length) html += '<div style="font-size:8px;color:var(--dim);font-family:Cinzel,serif;margin-top:1px">📜 ' + p.questList.join(' · ') + '</div>';
       if (p.wheelList.length) html += '<div style="font-size:8px;color:var(--dim);font-family:Cinzel,serif">🎰 ' + p.wheelList.join(' · ') + '</div>';
       html += '</div>';
-      html += '<div style="font-family:Cinzel,serif;font-size:15px;font-weight:700;color:var(--gold);flex-shrink:0">+$' + total + '</div>';
+      html += '<div style="font-family:Cinzel,serif;font-size:15px;font-weight:700;color:' + (dimmed?'var(--dim)':'var(--gold)') + ';flex-shrink:0">' + (dimmed ? '$0' : '+$'+total) + '</div>';
       html += '</div>';
     });
     html += '<div style="text-align:right;font-family:Cinzel,serif;font-size:11px;color:var(--dim);padding:6px 4px">';
@@ -3967,12 +4098,126 @@ function renderCoCommish() {
   html += '<div id="auditResults"></div>';
   html += '</div>';
 
-  // ── QUEST LEADERBOARD ────────────────────────────────────────
-  html += '<div class="stitle" style="margin-top:8px;margin-bottom:10px">📊 Season Leaderboard</div>';
-  html += renderQuestLeaderboard();
+  // ── STEP 5: WEEKLY RECAP ────────────────────────────────────
+  html += '<div style="background:rgba(201,168,76,.04);border:1px solid var(--gold-border);border-radius:14px;padding:16px;margin-bottom:20px">';
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">';
+  html += '<div class="stitle" style="margin:0">Step 5 — Generate Weekly Recap</div>';
+  html += '</div>';
+  html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-bottom:12px;line-height:1.7">';
+  html += 'After paying out FAAB, generate the weekly Chronicle. The recap will include matchup results, quest completions, notable transactions and lore-driven commentary.';
+  html += '</div>';
+  html += '<div style="display:flex;gap:10px;flex-wrap:wrap">';
+  html += '<button onclick="generateCoCommishRecap(' + selWeek + ')" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:14px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer">Generate Week ' + selWeek + ' Recap</button>';
+  html += '<button onclick="goToRecapTab()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:14px;border:1px solid rgba(255,255,255,.1);background:none;color:var(--dim);cursor:pointer">Go to Recap Tab -></button>';
+  html += '</div>';
+  html += '<div id="recapGenStatus" style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-top:10px"></div>';
+  html += '</div>';
+
+
 
   wrap.innerHTML = html;
+  } catch(err) {
+    console.error('renderCoCommish error:', err);
+    wrap.innerHTML = '<div style="font-family:Cinzel,serif;font-size:11px;color:#FF6B6B;padding:20px;text-align:center">⚠ Error: ' + err.message + '</div>';
+  }
 }
+
+function goToRecapTab() {
+  var recapBtn = null;
+  document.querySelectorAll('.nb').forEach(function(b){ if (b.textContent.indexOf('Recap') !== -1) recapBtn = b; });
+  showTab('recap', recapBtn);
+}
+
+function generateCoCommishRecap(weekNum) {
+  var statusEl = document.getElementById('recapGenStatus');
+  if (statusEl) statusEl.textContent = 'Pulling Sleeper data for Week ' + weekNum + '...';
+
+  safeFetch('/league/' + LID + '/matchups/' + weekNum).then(function(matchupData) {
+    safeFetch('/league/' + LID + '/transactions/' + weekNum).then(function(transData) {
+
+      var games = {};
+      if (matchupData) matchupData.forEach(function(m) {
+        if (!games[m.matchup_id]) games[m.matchup_id] = [];
+        games[m.matchup_id].push(m);
+      });
+
+      var matchupLines = [];
+      Object.values(games).forEach(function(pair) {
+        if (pair.length !== 2) return;
+        var a = pair[0], b = pair[1];
+        var rA = S.rosters.find(function(r){ return r.roster_id === a.roster_id; });
+        var rB = S.rosters.find(function(r){ return r.roster_id === b.roster_id; });
+        if (!rA || !rB) return;
+        var nA = resolveTeamName(rA, getUser(rA.owner_id));
+        var nB = resolveTeamName(rB, getUser(rB.owner_id));
+        var pA = (a.points||0).toFixed(1), pB = (b.points||0).toFixed(1);
+        if (parseFloat(pA) >= parseFloat(pB)) {
+          matchupLines.push(nA + ' ' + pA + ' def. ' + nB + ' ' + pB);
+        } else {
+          matchupLines.push(nB + ' ' + pB + ' def. ' + nA + ' ' + pA);
+        }
+      });
+
+      var completions = getQuestCompletions();
+      var questLines = [];
+      Object.keys(completions).forEach(function(mgr) {
+        var wc = completions[mgr].filter(function(c){ return c.week === weekNum; });
+        wc.forEach(function(c) { questLines.push(mgr + ' earned ' + c.questTitle + ' (+$' + c.faab + ' FAAB)'); });
+      });
+
+      var txLines = [];
+      if (transData) {
+        var players = JSON.parse(localStorage.getItem('nflPlayers') || '{}');
+        transData.slice(0, 15).forEach(function(t) {
+          if (t.type === 'waiver') {
+            var adds = Object.keys(t.adds||{}).map(function(pid){ var p=players[pid]; return p?p.full_name:pid; });
+            var rid = t.roster_ids && t.roster_ids[0];
+            var rr = S.rosters.find(function(r){ return r.roster_id === rid; });
+            var tn = rr ? resolveTeamName(rr, getUser(rr.owner_id)) : 'Unknown';
+            if (adds.length) txLines.push(tn + ' claimed ' + adds.join(', '));
+          } else if (t.type === 'trade') {
+            var traders = (t.roster_ids||[]).map(function(rid){
+              var rr = S.rosters.find(function(r){ return r.roster_id === rid; });
+              return rr ? resolveTeamName(rr, getUser(rr.owner_id)) : '?';
+            });
+            txLines.push('TRADE: ' + traders.join(' + '));
+          }
+        });
+      }
+
+      var scoresEl = document.getElementById('recapScores');
+      var notesEl  = document.getElementById('recapNotes');
+      var wkEl     = document.getElementById('recapWeekNum');
+
+      if (wkEl) wkEl.value = weekNum;
+      if (scoresEl) scoresEl.value = matchupLines.join('\n');
+
+      if (notesEl) {
+        var notes = '';
+        if (questLines.length) notes += 'QUEST COMPLETIONS:\n' + questLines.join('\n') + '\n\n';
+
+
+
+
+        if (txLines.length) notes += 'TRANSACTIONS:\n' + txLines.join('\n');
+
+
+        notesEl.value = notes;
+      }
+
+      if (statusEl) statusEl.textContent = 'Data loaded! Switching to Recap tab...';
+
+      setTimeout(function() {
+        goToRecapTab();
+        setTimeout(function() {
+          var genBtn = document.getElementById('recapGenBtn');
+          if (genBtn) genBtn.click();
+        }, 600);
+      }, 800);
+    });
+  });
+}
+
 
 function closeAuditPanel() {
   var panel = document.getElementById('auditPanel');
@@ -4014,6 +4259,102 @@ function submitPayoutWeek(weekNum) {
 }
 
 
+function renderRankings() {
+  var wrap = document.getElementById('rankingswrap');
+  if (!wrap) return;
+  if (!S || !S.rosters) {
+    wrap.innerHTML = '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--dim);padding:40px;text-align:center">Loading...</div>';
+    setTimeout(renderRankings, 800);
+    return;
+  }
+  try {
+    var BASE = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
+    var completions = getQuestCompletions();
+    var wheelHistory = getWheelHistory();
+    var me = getCurrentManager();
+
+    // Get division wins from Sleeper rosters
+    var divWinsMap = {};
+    S.rosters && S.rosters.forEach(function(r) {
+      var name = resolveTeamName(r, getUser(r.owner_id));
+      // Count wins from stored memory if available
+      var mem = getMemory ? getMemory() : {};
+      divWinsMap[name] = (mem.divWins && mem.divWins[name]) || 0;
+    });
+
+    // Build full stats per manager
+    var stats = MANAGERS.map(function(m) {
+      var mc = completions[m.name] || [];
+      var questCount = mc.length;
+      var questFaab  = mc.reduce(function(s,c){ return s+c.faab; }, 0);
+      var wheelFaab  = wheelHistory.filter(function(h){ return h.manager===m.name&&h.val>0; }).reduce(function(s,h){ return s+h.val; },0);
+      var totalFaab  = questFaab + wheelFaab;
+      var divWins    = divWinsMap[m.name] || 0;
+
+      // Get W/L from Sleeper rosters
+      var roster = S.rosters && S.rosters.find(function(r){
+        var n = resolveTeamName(r, getUser(r.owner_id));
+        return n === m.name;
+      });
+      var wins   = roster && roster.settings ? (roster.settings.wins   || 0) : 0;
+      var losses = roster && roster.settings ? (roster.settings.losses || 0) : 0;
+      var pf     = roster && roster.settings ? ((roster.settings.fpts  || 0) + (roster.settings.fpts_decimal||0)/100) : 0;
+
+      var div = TEAM_DIVISIONS[m.name] || 'north';
+      var dc  = DIV_COLORS_SI[div] || '#C9A84C';
+      var isMe = me && me.name === m.name;
+      return { m:m, questCount:questCount, questFaab:questFaab, wheelFaab:wheelFaab, totalFaab:totalFaab, divWins:divWins, wins:wins, losses:losses, pf:pf, dc:dc, isMe:isMe };
+    });
+
+    function makeCard(title, sorted, valFn) {
+      var medals = ['&#127945;','&#129352;','&#129353;'];
+      var h = '<div style="background:rgba(0,0,0,.3);border:1px solid var(--gold-border);border-radius:14px;padding:14px;flex:1;min-width:260px;max-width:340px">';
+      h += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:var(--gold);letter-spacing:1px;margin-bottom:12px;border-bottom:1px solid var(--gold-border);padding-bottom:8px">' + title + '</div>';
+      sorted.forEach(function(s, i) {
+        var crest = s.m.crest ? '<img src="' + BASE + s.m.crest + '" style="width:22px;height:22px;object-fit:contain;border-radius:3px;flex-shrink:0">' : '';
+        var medal = i < 3 ? '<span style="font-size:14px">' + medals[i] + '</span>' : '<span style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);min-width:18px;text-align:center">' + (i+1) + '</span>';
+        h += '<div style="display:flex;align-items:center;gap:7px;padding:5px 4px;border-radius:7px;background:' + (s.isMe?'rgba(201,168,76,.08)':'transparent') + '">';
+        h += medal;
+        h += crest;
+        h += '<div style="flex:1;font-family:Cinzel,serif;font-size:9px;color:' + (s.isMe?'var(--gold)':s.dc) + ';font-weight:' + (s.isMe?'700':'400') + '">' + s.m.name + (s.isMe?' &#10086;':'') + '</div>';
+        h += '<div style="font-family:Cinzel,serif;font-size:12px;font-weight:700;color:var(--gold)">' + valFn(s) + '</div>';
+        h += '</div>';
+      });
+      h += '</div>';
+      return h;
+    }
+
+    var byQuests  = stats.slice().sort(function(a,b){ return b.questCount-a.questCount||b.totalFaab-a.totalFaab; });
+    var byFaab    = stats.slice().sort(function(a,b){ return b.totalFaab-a.totalFaab||b.questCount-a.questCount; });
+
+    var totalFaabAll   = stats.reduce(function(s,x){return s+x.totalFaab;},0);
+    var totalQuestsAll = stats.reduce(function(s,x){return s+x.questCount;},0);
+
+    var html = '<div style="font-family:Cinzel,serif;font-size:22px;font-weight:900;color:var(--gold);letter-spacing:3px;margin-bottom:4px">&#127942; Realm Rankings</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-bottom:18px;letter-spacing:1px">Season 2 — All 16 Titans</div>';
+
+    // Summary totals
+    html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px">';
+    html += '<div style="background:rgba(201,168,76,.08);border:1px solid var(--gold-border);border-radius:10px;padding:10px 16px;font-family:Cinzel,serif"><div style="font-size:9px;color:var(--dim);letter-spacing:1px">QUESTS COMPLETED</div><div style="font-size:18px;font-weight:700;color:var(--gold)">' + totalQuestsAll + '</div></div>';
+    html += '<div style="background:rgba(201,168,76,.08);border:1px solid var(--gold-border);border-radius:10px;padding:10px 16px;font-family:Cinzel,serif"><div style="font-size:9px;color:var(--dim);letter-spacing:1px">TOTAL FAAB PAID OUT</div><div style="font-size:18px;font-weight:700;color:var(--gold)">$' + totalFaabAll + '</div></div>';
+    html += '</div>';
+
+    // 4 leaderboard cards
+    html += '<div style="display:flex;gap:12px;flex-wrap:wrap">';
+    html += makeCard('&#128220; Quests Completed', byQuests, function(s){ return s.questCount; });
+    html += makeCard('&#128176; FAAB Earned', byFaab, function(s){ return '$'+s.totalFaab; });
+
+    html += '</div>';
+
+    wrap.innerHTML = html;
+
+  } catch(err) {
+    console.error('renderRankings error:', err);
+    wrap.innerHTML = '<div style="color:#FF6B6B;font-family:Cinzel,serif;padding:20px">Error: ' + err.message + '</div>';
+  }
+}
+
+
 function renderQuestLeaderboard() {
   var lb = getQuestLeaderboard();
   var BASE = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
@@ -4029,7 +4370,7 @@ function renderQuestLeaderboard() {
     html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;' + (me?'color:var(--gold)':'') + '">';
     html += '<span style="font-size:11px;min-width:20px">' + medals[i] + '</span>';
     if (crestUrl) html += '<img src="' + crestUrl + '" style="width:20px;height:20px;object-fit:contain;border-radius:3px">';
-    html += '<div style="flex:1;font-family:Cinzel,serif;font-size:9px;color:' + (me?'var(--gold)':'var(--text)') + '">' + m.name.split(' ')[0] + '</div>';
+    html += '<div style="flex:1;font-family:Cinzel,serif;font-size:9px;color:' + (me?'var(--gold)':'var(--text)') + '">' + m.name + '</div>';
     html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:var(--gold)">' + m.count + '</div>';
     html += '</div>';
   });
@@ -4046,7 +4387,7 @@ function renderQuestLeaderboard() {
     html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 0">';
     html += '<span style="font-size:11px;min-width:20px">' + medals[i] + '</span>';
     if (crestUrl) html += '<img src="' + crestUrl + '" style="width:20px;height:20px;object-fit:contain;border-radius:3px">';
-    html += '<div style="flex:1;font-family:Cinzel,serif;font-size:9px;color:' + (me?'var(--gold)':'var(--text)') + '">' + m.name.split(' ')[0] + '</div>';
+    html += '<div style="flex:1;font-family:Cinzel,serif;font-size:9px;color:' + (me?'var(--gold)':'var(--text)') + '">' + m.name + '</div>';
     html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:var(--gold)">$' + m.totalFaab + '</div>';
     html += '</div>';
   });
