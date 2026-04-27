@@ -4335,9 +4335,11 @@ function renderCoCommish() {
   });
   var maxWeek = Math.max(week, activePayoutWeek, 1);
 
-  // Read selected week from existing dropdown
+  // Read selected week from existing dropdown or localStorage (set by advanceToNextWeek)
   var selEl = document.getElementById('payoutWeekSel');
-  var selWeek = selEl ? parseInt(selEl.value) : activePayoutWeek;
+  var storedSelWeek = parseInt(localStorage.getItem('cocommishSelWeek') || '0');
+  var selWeek = selEl ? parseInt(selEl.value) : (storedSelWeek || activePayoutWeek);
+  if (!selEl && storedSelWeek) selWeek = storedSelWeek;
 
   var html = '<div class="stitle">⚔ Commissioner Control Center</div>';
   html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-bottom:16px;letter-spacing:1px">Commissioner · Season 2 · Current Sleeper Week: ' + week + '</div>';
@@ -4357,14 +4359,15 @@ function renderCoCommish() {
     {n:2, label:'Run AI Audit'},
     {n:3, label:'Confirm FAAB'},
     {n:4, label:'Pay Warrior'},
-    {n:5, label:'Submit Week'}
+    {n:5, label:'Submit Week'},
+    {n:6, label:'Generate Recap'}
   ];
   html += '<div style="display:flex;gap:0;margin-bottom:20px;border-radius:12px;overflow:hidden;border:1px solid var(--gold-border)">';
   stepDefs.forEach(function(step, i) {
     var done = stepsDone.indexOf(step.n) !== -1;
     var bg   = done ? 'rgba(110,222,126,.15)' : 'rgba(201,168,76,.06)';
     var col  = done ? '#6EDE7E' : 'var(--dim)';
-    var border = i < 4 ? '1px solid var(--gold-border)' : 'none';
+    var border = i < 5 ? '1px solid var(--gold-border)' : 'none';
     var check = done ? '&#10003; ' : (step.n + '. ');
     html += '<div style="flex:1;padding:10px 4px;text-align:center;font-family:Cinzel,serif;font-size:8px;letter-spacing:.5px;background:' + bg + ';color:' + col + ';border-right:' + border + ';font-weight:' + (done?'700':'400') + ';transition:all .3s">' + check + step.label + '</div>';
   });
@@ -4513,19 +4516,27 @@ function renderCoCommish() {
   html += '<div id="auditResults"></div>';
   html += '</div>';
 
-  // ── STEP 5: WEEKLY RECAP ────────────────────────────────────
-  html += '<div style="background:rgba(201,168,76,.04);border:1px solid var(--gold-border);border-radius:14px;padding:16px;margin-bottom:20px">';
+  // ── STEP 6: WEEKLY RECAP ────────────────────────────────────
+  var recapDone = stepsDone.indexOf(6) !== -1;
+  html += '<div style="background:rgba(201,168,76,.04);border:1px solid ' + (recapDone?'rgba(110,222,126,.3)':'var(--gold-border)') + ';border-radius:14px;padding:16px;margin-bottom:20px">';
   html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">';
-  html += '<div class="stitle" style="margin:0">Step 6 — Generate Weekly Recap</div>';
+  html += '<div class="stitle" style="margin:0;color:' + (recapDone?'#6EDE7E':'var(--gold)') + '">Step 6 — Generate Weekly Recap' + (recapDone?' &#10003;':'') + '</div>';
   html += '</div>';
-  html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-bottom:12px;line-height:1.7">';
-  html += 'After paying out FAAB, generate the weekly Chronicle. The recap will include matchup results, quest completions, notable transactions and lore-driven commentary.';
-  html += '</div>';
-  html += '<div style="display:flex;gap:10px;flex-wrap:wrap">';
-  html += '<button onclick="generateCoCommishRecap(' + selWeek + ')" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:14px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer">Generate Week ' + selWeek + ' Recap</button>';
-  html += '<button onclick="goToRecapTab()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:14px;border:1px solid rgba(255,255,255,.1);background:none;color:var(--dim);cursor:pointer">Go to Recap Tab -></button>';
-  html += '</div>';
-  html += '<div id="recapGenStatus" style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-top:10px"></div>';
+  if (recapDone) {
+    html += '<div style="font-family:Cinzel,serif;font-size:10px;color:#6EDE7E;margin-bottom:14px">&#10003; Week ' + selWeek + ' Chronicle generated and submitted to Recap tab.</div>';
+    html += '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">';
+    html += '<button onclick="goToRecapTab()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:14px;border:1px solid rgba(110,222,126,.4);background:rgba(110,222,126,.08);color:#6EDE7E;cursor:pointer">&#128220; View Recap</button>';
+    html += '<button onclick="advanceToNextWeek(' + selWeek + ')" style="font-family:Cinzel,serif;font-size:11px;font-weight:700;letter-spacing:1px;padding:11px 24px;border-radius:14px;border:2px solid var(--gold);background:rgba(201,168,76,.2);color:var(--gold);cursor:pointer">&#9889; Begin Week ' + (selWeek+1) + ' Workflow &#8594;</button>';
+    html += '<span style="font-family:Cinzel,serif;font-size:9px;color:var(--dim)">All 6 steps complete &#10003; Week ' + selWeek + ' done!</span>';
+    html += '</div>';
+  } else {
+    html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-bottom:12px;line-height:1.7">After paying out FAAB, generate the weekly Chronicle. The recap pulls matchup results, quest completions, and notable transactions — then Claude writes the lore.</div>';
+    html += '<div style="display:flex;gap:10px;flex-wrap:wrap">';
+    html += '<button onclick="generateCoCommishRecap(' + selWeek + ')" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:14px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer">&#9758; Generate Week ' + selWeek + ' Recap</button>';
+    html += '<button onclick="goToRecapTab()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:14px;border:1px solid rgba(255,255,255,.1);background:none;color:var(--dim);cursor:pointer">Go to Recap Tab &#8594;</button>';
+    html += '</div>';
+    html += '<div id="recapGenStatus" style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-top:10px"></div>';
+  }
   html += '</div>';
 
 
@@ -4541,6 +4552,19 @@ function goToRecapTab() {
   var recapBtn = null;
   document.querySelectorAll('.nb').forEach(function(b){ if (b.textContent.indexOf('Recap') !== -1) recapBtn = b; });
   showTab('recap', recapBtn);
+}
+
+function advanceToNextWeek(currentWeek) {
+  var nextWeek = currentWeek + 1;
+  // Store as the selected week so it persists on re-render
+  localStorage.setItem('cocommishSelWeek', nextWeek);
+  var sel = document.getElementById('payoutWeekSel');
+  if (sel) { sel.value = nextWeek; }
+  renderCoCommish();
+  // Scroll co-commish section to top
+  var sec = document.getElementById('sec-cocommish');
+  if (sec) sec.scrollTop = 0;
+  window.scrollTo(0, 0);
 }
 
 function generateCoCommishRecap(weekNum) {
@@ -4626,7 +4650,12 @@ function generateCoCommishRecap(weekNum) {
         goToRecapTab();
         setTimeout(function() {
           var genBtn = document.getElementById('recapGenBtn');
-          if (genBtn) genBtn.click();
+          if (genBtn) {
+            genBtn.click();
+            // Mark step 6 done after recap fires
+            markStepDone(weekNum, 6);
+            setTimeout(renderCoCommish, 1500);
+          }
         }, 600);
       }, 800);
     });
