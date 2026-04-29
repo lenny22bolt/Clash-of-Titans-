@@ -2804,6 +2804,7 @@ var WV_REGIONS = [
     sceneBg: 'linear-gradient(160deg,#0a1628 0%,#0d2040 30%,#1a3a5c 60%,#0a1628 100%)',
     sceneAccent: '#7BB8E8',
     terrain: 'ice',
+    bgImage: 'realm-north.jpg',
     desc: 'Frozen realm of discipline, defense, and ancient runes.',
     lore: 'Where glaciers meet the sky and champions are forged in the coldest winters.',
     teams: ['IceMonkey','Fenrir\'s Fury','Warrior Shohei Goatani','Orion Leaf']
@@ -2815,6 +2816,7 @@ var WV_REGIONS = [
     sceneBg: 'linear-gradient(160deg,#061a0a 0%,#0d2e10 30%,#1a4a1e 60%,#061a0a 100%)',
     sceneAccent: '#6EDE7E',
     terrain: 'forest',
+    bgImage: 'realm-east.jpg',
     desc: 'Mystic forest realm of growth, speed, and hidden power.',
     lore: 'Ancient trees whisper secrets of dynasties yet to rise from the emerald mist.',
     teams: ['Lord of Dreams','Notchotaur','Lord Jefita Clapper','Talon']
@@ -2826,6 +2828,7 @@ var WV_REGIONS = [
     sceneBg: 'linear-gradient(160deg,#1a0500 0%,#2e0a00 30%,#4a1400 60%,#1a0500 100%)',
     sceneAccent: '#FF6B6B',
     terrain: 'lava',
+    bgImage: 'realm-west.jpg',
     desc: 'Volcanic realm of chaos, pressure, and raw strength.',
     lore: 'The earth itself bleeds here. Only the strongest survive the eternal eruption.',
     teams: ['ChatG-TDs','Dewie Slayer of Bakunawa','Son of Rander','Heir of Zeus']
@@ -2837,6 +2840,7 @@ var WV_REGIONS = [
     sceneBg: 'linear-gradient(160deg,#1a1000 0%,#2e1e00 30%,#4a3200 60%,#1a1000 100%)',
     sceneAccent: '#FFD580',
     terrain: 'desert',
+    bgImage: 'realm-south.jpg',
     desc: 'Sunlit realm of legacy, glory, and divine ambition.',
     lore: 'Golden temples rise from sacred sands where gods once walked among champions.',
     teams: ['Hermes Hail Marys','Wrath of Moctezuma','Beercules the Destroyer','Stefanos the Spartan King']
@@ -3083,49 +3087,111 @@ function renderZoomedRegion(region) {
   var zoomed = document.getElementById('wvZoomedView');
   if (!zoomed) return;
   var c = region.color;
+  var BASE = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
+  var bgUrl = BASE + (region.bgImage || 'realm-north.png');
 
-  var html = '<div class="wv-village-scene" style="background:'+region.sceneBg+';min-height:420px;position:relative">';
-  // Atmosphere overlay
-  html += '<div style="position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 40%,rgba(0,0,0,0.5) 100%);pointer-events:none;z-index:3"></div>';
-  // Terrain elements
-  html += wvBuildTerrainElements(region.terrain, c);
-  // Particles
-  html += wvBuildParticles(region.terrain, 20);
-  // 4 team village bases
-  region.teams.forEach(function(tn, i) { html += wvBuildVillageBase(tn, i, region.terrain, c); });
-  // 4 NPCs walking (one per team)
-  region.teams.forEach(function(tn, i) { html += wvBuildNPC(tn, region.terrain, c, i); });
-  // Ground path connectors
-  html += '<svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0" viewBox="0 0 100 100" preserveAspectRatio="none">';
-  html += '<path d="M25,50 Q50,40 75,45" stroke="'+c+'" stroke-width="0.8" fill="none" stroke-opacity="0.2" stroke-dasharray="2,3"/>';
-  html += '<path d="M25,68 Q50,60 65,65" stroke="'+c+'" stroke-width="0.8" fill="none" stroke-opacity="0.2" stroke-dasharray="2,3"/>';
-  html += '<path d="M35,50 Q38,60 28,68" stroke="'+c+'" stroke-width="0.8" fill="none" stroke-opacity="0.2" stroke-dasharray="2,3"/>';
-  html += '<path d="M68,45 Q65,56 65,65" stroke="'+c+'" stroke-width="0.8" fill="none" stroke-opacity="0.2" stroke-dasharray="2,3"/>';
-  html += '</svg>';
-  // Center arena marker
-  html += '<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:3;text-align:center;pointer-events:none">';
-  html += '<div style="width:40px;height:40px;border-radius:50%;border:2px solid '+c+';box-shadow:0 0 20px '+c+',0 0 40px '+c.replace(')',',0.4)')+';background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;font-size:20px">'+region.icon+'</div>';
+  // Teams spread across the full village — 4 corners of the scene
+  var villagePositions = [
+    {left:'25%', top:'22%'},  // top-left area
+    {left:'72%', top:'25%'},  // top-right area
+    {left:'22%', top:'65%'},  // bottom-left area
+    {left:'70%', top:'68%'}   // bottom-right area
+  ];
+
+  var npcPositions = [
+    {left:'35%', top:'38%', dx:'22px', dur:'6s', delay:'0s'},
+    {left:'58%', top:'35%', dx:'18px', dur:'5s', delay:'1.2s'},
+    {left:'33%', top:'55%', dx:'20px', dur:'7s', delay:'0.6s'},
+    {left:'60%', top:'58%', dx:'16px', dur:'5.5s', delay:'2s'}
+  ];
+
+  var html = '<div style="position:relative;width:100%;padding-bottom:75%;overflow:hidden;border-radius:14px 14px 0 0">';
+
+  // Real background image
+  html += '<img src="'+bgUrl+'" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.background=\''+region.sceneBg+'\'">';
+
+  // Dark overlay for readability
+  html += '<div style="position:absolute;inset:0;background:rgba(0,0,0,0.25);pointer-events:none;z-index:1"></div>';
+
+  // Particles on top of image
+  html += wvBuildParticles(region.terrain, 15);
+
+  // Region name — top center
+  html += '<div style="position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:10;text-align:center;white-space:nowrap;pointer-events:none">';
+  html += '<div style="font-family:\'Cinzel Decorative\',serif;font-size:15px;font-weight:700;color:'+c+';text-shadow:0 0 20px '+c+',0 2px 8px rgba(0,0,0,0.95);letter-spacing:2px;background:rgba(0,0,0,0.55);padding:4px 16px;border-radius:20px;border:1px solid '+c+'40">'+region.icon+' '+region.name+'</div>';
   html += '</div>';
-  // Region name header
-  html += '<div style="position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:10;text-align:center;white-space:nowrap">';
-  html += '<div style="font-family:\'Cinzel Decorative\',serif;font-size:16px;font-weight:700;color:'+c+';text-shadow:0 0 20px '+c+',0 2px 8px rgba(0,0,0,0.9);letter-spacing:2px">'+region.name+'</div>';
-  html += '<div style="font-family:Cinzel,serif;font-size:9px;color:rgba(255,255,255,0.6);letter-spacing:3px;margin-top:2px">'+region.desc.toUpperCase()+'</div>';
-  html += '</div>';
-  html += '</div>';
-  // Team panel slot
-  html += '<div id="wvTeamPanel" style="display:none;margin-top:8px"></div>';
-  // Stats bar
-  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;padding:10px 14px;background:rgba(0,0,0,0.5);border-top:1px solid rgba('+( c==='#7BB8E8'?'123,184,232':c==='#6EDE7E'?'110,222,126':c==='#FF6B6B'?'255,107,107':'255,213,128' )+',0.25)">';
+
+  // Team village bases on the diamond
+  region.teams.forEach(function(tn, i) {
+    var pos = villagePositions[i];
+    var data = wvGetTeamData(tn);
+    var mgr = data.mgr;
+    var shortName = tn.split(' ')[0];
+    if (tn==='Warrior Shohei Goatani') shortName='Shohei';
+    if (tn==='Dewie Slayer of Bakunawa') shortName='Dewie';
+    if (tn==='Lord Jefita Clapper') shortName='Jefita';
+    if (tn==='Beercules the Destroyer') shortName='Beercules';
+    if (tn==='Stefanos the Spartan King') shortName='Stefanos';
+    if (tn==='Wrath of Moctezuma') shortName='Moctezuma';
+    if (tn==='Hermes Hail Marys') shortName='Hermes';
+    if (tn==="Fenrir's Fury") shortName='Fenrir';
+    if (tn==='Lord of Dreams') shortName='LoDreams';
+    if (tn==='Son of Rander') shortName='Rander';
+    if (tn==='Heir of Zeus') shortName='Zeus';
+
+    html += '<div style="position:absolute;left:'+pos.left+';top:'+pos.top+';transform:translate(-50%,-50%);z-index:6;text-align:center;cursor:pointer" onclick="wvShowTeamDetail(\''+tn.replace(/'/g,'\\x27')+'\')">';
+    // Platform shadow
+    html += '<div style="width:54px;height:20px;background:rgba(0,0,0,0.4);border-radius:50%;filter:blur(4px);margin:0 auto;transform:translateY(4px)"></div>';
+    // Crest badge
+    html += '<div style="width:46px;height:46px;border-radius:50%;border:3px solid '+c+';box-shadow:0 0 12px '+c+',0 0 24px '+c.replace(')',',0.4)')+';background:rgba(5,13,21,0.85);margin:0 auto;overflow:hidden;position:relative">';
+    if (mgr.crest) html += '<img src="'+BASE+mgr.crest+'" style="width:100%;height:100%;object-fit:contain" onerror="this.style.display=\'none\'">';
+    html += '</div>';
+    // Flag pole
+    html += '<div style="width:2px;height:20px;background:rgba(200,180,100,0.9);margin:0 auto;position:relative">';
+    html += '<div class="wv-flag" style="position:absolute;top:0;left:2px;width:14px;height:9px;background:'+c+';opacity:0.95;transform-origin:left center"></div>';
+    html += '</div>';
+    // Name + record
+    html += '<div style="background:rgba(0,0,0,0.75);border:1px solid '+c+'60;border-radius:8px;padding:3px 8px;margin-top:2px;backdrop-filter:blur(4px)">';
+    html += '<div style="font-family:Cinzel,serif;font-size:9px;font-weight:700;color:'+c+';white-space:nowrap">'+shortName+'</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:8px;color:rgba(255,255,255,0.7)">'+data.w+'-'+data.l+'</div>';
+    html += '</div>';
+    html += '</div>';
+  });
+
+  // NPC walkers
+  region.teams.forEach(function(tn, i) {
+    var p = npcPositions[i];
+    var mgr = MANAGERS.find(function(m){ return m.name===tn; }) || {};
+    html += '<div class="wv-npc" style="position:absolute;left:'+p.left+';top:'+p.top+';--wv-dx:'+p.dx+';--wv-dur:'+p.dur+';animation-delay:'+p.delay+','+p.delay+';z-index:5">';
+    html += '<div style="position:relative;width:22px;height:30px">';
+    html += '<div style="position:absolute;top:0;left:50%;transform:translateX(-50%);width:16px;height:16px;border-radius:50%;border:2px solid '+c+';background:#0a0a1a;overflow:hidden;box-shadow:0 0 5px '+c+'">';
+    if (mgr.crest) html += '<img src="'+BASE+mgr.crest+'" style="width:100%;height:100%;object-fit:contain" onerror="this.style.display=\'none\'">';
+    html += '</div>';
+    html += '<div style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);width:9px;height:12px;background:'+c+';border-radius:2px 2px 0 0;opacity:0.85"></div>';
+    html += '<div style="position:absolute;bottom:0;left:50%;transform:translateX(-65%);width:3px;height:5px;background:'+c+';opacity:0.7;border-radius:0 0 2px 2px"></div>';
+    html += '<div style="position:absolute;bottom:0;left:50%;transform:translateX(15%);width:3px;height:5px;background:'+c+';opacity:0.7;border-radius:0 0 2px 2px"></div>';
+    html += '</div></div>';
+  });
+
+  // Team panel slot (filled by wvShowTeamDetail)
+  html += '<div id="wvTeamPanel" style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:90%;max-width:340px;z-index:20;display:none"></div>';
+
+  html += '</div>'; // end relative container
+
+  // Bottom stats bar
+  var rgbStr = c==='#7BB8E8'?'123,184,232':c==='#6EDE7E'?'110,222,126':c==='#FF6B6B'?'255,107,107':'255,213,128';
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px;background:rgba(0,0,0,0.6);border-top:1px solid rgba('+rgbStr+',0.3)">';
   region.teams.forEach(function(tn) {
     var d = wvGetTeamData(tn);
     var mgr = d.mgr;
-    html += '<div style="flex:1;min-width:120px;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.3);border-radius:8px;padding:6px 8px;border:1px solid rgba('+( c==='#7BB8E8'?'123,184,232':c==='#6EDE7E'?'110,222,126':c==='#FF6B6B'?'255,107,107':'255,213,128' )+',0.2)">';
-    if (mgr.crest) html += '<img src="https://lenny22bolt.github.io/Clash-of-Titans-/'+mgr.crest+'" style="width:22px;height:22px;object-fit:contain;border-radius:3px;flex-shrink:0">';
+    html += '<div style="flex:1;min-width:110px;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.4);border-radius:8px;padding:6px 8px;border:1px solid rgba('+rgbStr+',0.25);cursor:pointer" onclick="wvShowTeamDetail(\''+tn.replace(/'/g,'\\x27')+'\')">';
+    if (mgr.crest) html += '<img src="'+BASE+mgr.crest+'" style="width:22px;height:22px;object-fit:contain;border-radius:3px;flex-shrink:0">';
     html += '<div style="min-width:0"><div style="font-family:Cinzel,serif;font-size:9px;font-weight:700;color:'+c+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+tn.split(' ')[0]+'</div>';
-    html += '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim)">'+d.w+'-'+d.l+' · '+d.questCount+' quests</div></div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim)">'+d.w+'-'+d.l+' · '+d.questCount+' Q · $'+d.totalFaab+'</div></div>';
     html += '</div>';
   });
   html += '</div>';
+
   zoomed.innerHTML = html;
 }
 
