@@ -3018,11 +3018,11 @@ function wvBuildNPC(teamName, terrain, color, pathIdx, npcImage) {
 function wvNPCFigureHTML(mgr, color, BASE, npcImage) {
   var charSrc = npcImage ? BASE + npcImage + '?v=2' : '';
   var crestSrc = mgr && mgr.crest ? BASE + mgr.crest : '';
-  var html = '<div class="wv-npc-inner" style="position:relative;width:52px;height:68px;background:transparent">';
-  html += '<div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);width:32px;height:8px;background:rgba(0,0,0,0.5);border-radius:50%;filter:blur(3px)"></div>';
-  html += '<div class="wv-npc-aura" style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:40px;height:14px;background:'+color+';border-radius:50%;filter:blur(6px);opacity:0.45;animation:wv-npc-aura 2s ease-in-out infinite"></div>';
+  var html = '<div class="wv-npc-inner" style="position:relative;width:36px;height:48px;background:transparent">';
+  html += '<div style="position:absolute;bottom:-3px;left:50%;transform:translateX(-50%);width:24px;height:6px;background:rgba(0,0,0,0.45);border-radius:50%;filter:blur(2px)"></div>';
+  html += '<div class="wv-npc-aura" style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:28px;height:10px;background:'+color+';border-radius:50%;filter:blur(5px);opacity:0.4;animation:wv-npc-aura 2s ease-in-out infinite"></div>';
   if (charSrc) {
-    html += '<img src="'+charSrc+'" class="wv-npc-body-img" style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);width:46px;height:54px;object-fit:contain;background:transparent;mix-blend-mode:normal;animation:wv-npc-bob 1.1s ease-in-out infinite" onerror="this.remove()">';
+    html += '<img src="'+charSrc+'" class="wv-npc-body-img" style="position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:32px;height:38px;object-fit:contain;background:transparent;animation:wv-npc-bob 1.1s ease-in-out infinite" onerror="this.remove()">';
   } else {
     html += '<div class="wv-npc-arm-l" style="position:absolute;bottom:20px;left:3px;width:6px;height:12px;background:'+color+';border-radius:3px;opacity:0.8;transform-origin:top center"></div>';
     html += '<div class="wv-npc-arm-r" style="position:absolute;bottom:20px;right:3px;width:6px;height:12px;background:'+color+';border-radius:3px;opacity:0.8;transform-origin:top center"></div>';
@@ -3048,19 +3048,19 @@ function wvShowTeamDetail(teamName) {
   var color = DIV_COLORS_SI[div] || '#C9A84C';
   var panel = document.getElementById('wvTeamPanel');
   if (!panel) return;
-  panel.innerHTML = '<div class="wv-info-panel" style="background:linear-gradient(135deg,rgba(5,13,21,0.97),rgba(13,27,42,0.97));border:2px solid '+color+';border-radius:14px;padding:16px;box-shadow:0 0 30px '+color.replace(')',',0.3)')+'">'
-    + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">'
-    + (mgr.crest ? '<img src="'+BASE+mgr.crest+'" style="width:48px;height:48px;object-fit:contain;border-radius:8px;border:1.5px solid '+color+'">' : '')
-    + '<div><div style="font-family:Cinzel,serif;font-size:13px;font-weight:700;color:'+color+'">'+teamName+'</div>'
-    + '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim)">'+mgr.username+' · '+(mgr.emoji||'⚔')+'</div></div>'
-    + '<button onclick="document.getElementById(\'wvTeamPanel\').innerHTML=\'\'" style="margin-left:auto;background:none;border:none;color:var(--dim);cursor:pointer;font-size:14px">✕</button>'
+  panel.innerHTML = '<div class="wv-info-panel" style="background:linear-gradient(180deg,rgba(5,13,21,0.97),rgba(13,27,42,0.99));border-top:2px solid '+color+';padding:10px 12px;animation:wv-panel-in .3s ease-out">'
+    + '<div style="display:flex;align-items:center;gap:9px;margin-bottom:8px">'
+    + (mgr.crest ? '<img src="'+BASE+mgr.crest+'" style="width:32px;height:32px;object-fit:contain;border-radius:6px;border:1.5px solid '+color+'">' : '')
+    + '<div style="flex:1"><div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:'+color+'">'+teamName+'</div>'
+    + '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim)">'+(mgr.username||'')+'</div></div>'
+    + '<button onclick="document.getElementById(\'wvTeamPanel\').style.display=\'none\'" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:18px;line-height:1;padding:0 2px">&#10005;</button>'
     + '</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">'
-    + '<div style="background:rgba(0,0,0,.4);border-radius:8px;padding:8px;text-align:center"><div style="font-family:Cinzel,serif;font-size:18px;font-weight:700;color:'+color+'">'+data.w+'-'+data.l+'</div><div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim)">RECORD</div></div>'
-    + '<div style="background:rgba(0,0,0,.4);border-radius:8px;padding:8px;text-align:center"><div style="font-family:Cinzel,serif;font-size:18px;font-weight:700;color:var(--gold)">'+data.questCount+'</div><div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim)">QUESTS</div></div>'
-    + '<div style="background:rgba(0,0,0,.4);border-radius:8px;padding:8px;text-align:center"><div style="font-family:Cinzel,serif;font-size:18px;font-weight:700;color:#6EDE7E">$'+data.totalFaab+'</div><div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim)">FAAB</div></div>'
+    + '<div style="display:flex;gap:5px;margin-bottom:8px">'
+    + '<div style="flex:1;background:rgba(0,0,0,.4);border-radius:7px;padding:6px 4px;text-align:center"><div style="font-family:Cinzel,serif;font-size:15px;font-weight:700;color:'+color+'">'+data.w+'-'+data.l+'</div><div style="font-family:Cinzel,serif;font-size:7px;color:var(--dim)">RECORD</div></div>'
+    + '<div style="flex:1;background:rgba(0,0,0,.4);border-radius:7px;padding:6px 4px;text-align:center"><div style="font-family:Cinzel,serif;font-size:15px;font-weight:700;color:var(--gold)">'+data.questCount+'</div><div style="font-family:Cinzel,serif;font-size:7px;color:var(--dim)">QUESTS</div></div>'
+    + '<div style="flex:1;background:rgba(0,0,0,.4);border-radius:7px;padding:6px 4px;text-align:center"><div style="font-family:Cinzel,serif;font-size:15px;font-weight:700;color:#6EDE7E">$'+data.totalFaab+'</div><div style="font-family:Cinzel,serif;font-size:7px;color:var(--dim)">FAAB</div></div>'
     + '</div>'
-    + '<button onclick="viewRoster('+((S.rosters&&S.rosters.find(function(r){var u=getUser(r.owner_id);return resolveTeamName(r,u)===teamName;}))||{roster_id:0}).roster_id+',true);document.getElementById(\'wvTeamPanel\').innerHTML=\'\'" style="font-family:Cinzel,serif;font-size:9px;font-weight:700;letter-spacing:1px;padding:7px 16px;border-radius:12px;border:1px solid '+color+';background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer;width:100%">View Full Roster →</button>'
+    + '<button onclick="viewRoster('+((S.rosters&&S.rosters.find(function(r){var u=getUser(r.owner_id);return resolveTeamName(r,u)===teamName;}))||{roster_id:0}).roster_id+',true);document.getElementById(\'wvTeamPanel\').style.display=\'none\'" style="font-family:Cinzel,serif;font-size:9px;font-weight:700;letter-spacing:1px;padding:7px;border-radius:8px;border:1px solid '+color+';background:rgba(201,168,76,.1);color:var(--gold);cursor:pointer;width:100%">View Full Roster &#8594;</button>'
     + '</div>';
   panel.style.display = 'block';
 }
@@ -3118,36 +3118,23 @@ function renderZoomedRegion(region) {
 
   // Teams spread across the full village — 4 corners of the scene
   var villagePositions = [
-    {left:'25%', top:'22%'},  // top-left area
-    {left:'72%', top:'25%'},  // top-right area
-    {left:'22%', top:'65%'},  // bottom-left area
-    {left:'70%', top:'68%'}   // bottom-right area
-  ];
-
-  var npcPositions = [
-    {left:'35%', top:'38%', dx:'22px', dur:'6s', delay:'0s'},
-    {left:'58%', top:'35%', dx:'18px', dur:'5s', delay:'1.2s'},
-    {left:'33%', top:'55%', dx:'20px', dur:'7s', delay:'0.6s'},
-    {left:'60%', top:'58%', dx:'16px', dur:'5.5s', delay:'2s'}
+    {left:'25%', top:'22%'},
+    {left:'72%', top:'25%'},
+    {left:'22%', top:'65%'},
+    {left:'70%', top:'68%'}
   ];
 
   var html = '<div style="position:relative;width:100%;padding-bottom:75%;overflow:hidden;border-radius:14px 14px 0 0">';
-
-  // Real background image
   html += '<img src="'+bgUrl+'" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.background=\''+region.sceneBg+'\'">';
+  html += '<div style="position:absolute;inset:0;background:rgba(0,0,0,0.2);pointer-events:none;z-index:1"></div>';
+  html += wvBuildParticles(region.terrain, 10);
 
-  // Dark overlay for readability
-  html += '<div style="position:absolute;inset:0;background:rgba(0,0,0,0.25);pointer-events:none;z-index:1"></div>';
-
-  // Particles on top of image
-  html += wvBuildParticles(region.terrain, 15);
-
-  // Region name — top center
-  html += '<div style="position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:10;text-align:center;white-space:nowrap;pointer-events:none">';
-  html += '<div style="font-family:\'Cinzel Decorative\',serif;font-size:15px;font-weight:700;color:'+c+';text-shadow:0 0 20px '+c+',0 2px 8px rgba(0,0,0,0.95);letter-spacing:2px;background:rgba(0,0,0,0.55);padding:4px 16px;border-radius:20px;border:1px solid '+c+'40">'+region.icon+' '+region.name+'</div>';
+  // Region name pill
+  html += '<div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:10;text-align:center;white-space:nowrap;pointer-events:none">';
+  html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:'+c+';text-shadow:0 0 12px '+c+';letter-spacing:1px;background:rgba(0,0,0,0.7);padding:3px 12px;border-radius:20px;border:1px solid '+c+'50">'+region.icon+' '+region.name+'</div>';
   html += '</div>';
 
-  // Team village bases on the diamond
+  // Team bases — mobile sized
   region.teams.forEach(function(tn, i) {
     var pos = villagePositions[i];
     var data = wvGetTeamData(tn);
@@ -3164,47 +3151,39 @@ function renderZoomedRegion(region) {
     if (tn==='Lord of Dreams') shortName='LoDreams';
     if (tn==='Son of Rander') shortName='Rander';
     if (tn==='Heir of Zeus') shortName='Zeus';
-
-    html += '<div style="position:absolute;left:'+pos.left+';top:'+pos.top+';transform:translate(-50%,-50%);z-index:6;text-align:center;cursor:pointer" onclick="wvShowTeamDetail(\''+tn.replace(/'/g,'\\x27')+'\')">';
-    // Platform shadow
-    html += '<div style="width:54px;height:20px;background:rgba(0,0,0,0.4);border-radius:50%;filter:blur(4px);margin:0 auto;transform:translateY(4px)"></div>';
-    // Crest badge
-    html += '<div style="width:46px;height:46px;border-radius:50%;border:3px solid '+c+';box-shadow:0 0 12px '+c+',0 0 24px '+c.replace(')',',0.4)')+';background:rgba(5,13,21,0.85);margin:0 auto;overflow:hidden;position:relative">';
+    html += '<div style="position:absolute;left:'+pos.left+';top:'+pos.top+';transform:translate(-50%,-50%);z-index:6;text-align:center;cursor:pointer" onclick="wvShowTeamDetail(\''+tn.replace(/'/g, "\\x27")+'\')">';
+    html += '<div style="width:30px;height:30px;border-radius:50%;border:2px solid '+c+';box-shadow:0 0 8px '+c+';background:rgba(5,13,21,0.88);margin:0 auto;overflow:hidden">';
     if (mgr.crest) html += '<img src="'+BASE+mgr.crest+'" style="width:100%;height:100%;object-fit:contain" onerror="this.style.display=\'none\'">';
     html += '</div>';
-    // Flag pole
-    html += '<div style="width:2px;height:20px;background:rgba(200,180,100,0.9);margin:0 auto;position:relative">';
-    html += '<div class="wv-flag" style="position:absolute;top:0;left:2px;width:14px;height:9px;background:'+c+';opacity:0.95;transform-origin:left center"></div>';
+    html += '<div style="width:1.5px;height:12px;background:rgba(200,180,100,0.85);margin:0 auto;position:relative">';
+    html += '<div class="wv-flag" style="position:absolute;top:0;left:1.5px;width:9px;height:6px;background:'+c+';opacity:0.95;transform-origin:left center"></div>';
     html += '</div>';
-    // Name + record
-    html += '<div style="background:rgba(0,0,0,0.75);border:1px solid '+c+'60;border-radius:8px;padding:3px 8px;margin-top:2px;backdrop-filter:blur(4px)">';
-    html += '<div style="font-family:Cinzel,serif;font-size:9px;font-weight:700;color:'+c+';white-space:nowrap">'+shortName+'</div>';
-    html += '<div style="font-family:Cinzel,serif;font-size:8px;color:rgba(255,255,255,0.7)">'+data.w+'-'+data.l+'</div>';
+    html += '<div style="background:rgba(0,0,0,0.82);border:1px solid '+c+'50;border-radius:5px;padding:1px 4px;margin-top:1px">';
+    html += '<div style="font-family:Cinzel,serif;font-size:7px;font-weight:700;color:'+c+';white-space:nowrap">'+shortName+'</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:6px;color:rgba(255,255,255,0.65)">'+data.w+'-'+data.l+'</div>';
     html += '</div>';
     html += '</div>';
   });
 
-  // NPC walkers — built via wvBuildNPC for full JS roamer support
+  // NPCs
   region.teams.forEach(function(tn, i) {
     html += wvBuildNPC(tn, region.terrain, region.color, i, region.npcImage);
   });
 
-  // Team panel slot (filled by wvShowTeamDetail)
-  html += '<div id="wvTeamPanel" style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:90%;max-width:340px;z-index:20;display:none"></div>';
+  // Team panel — full width bottom sheet
+  html += '<div id="wvTeamPanel" style="position:absolute;bottom:0;left:0;right:0;z-index:20;display:none"></div>';
+  html += '</div>';
 
-  html += '</div>'; // end relative container
-
-  // Bottom stats bar
+  // Bottom stats — horizontal scroll
   var rgbStr = region.color==='#7BB8E8'?'123,184,232':region.color==='#6EDE7E'?'110,222,126':region.color==='#FF6B6B'?'255,107,107':'255,213,128';
-  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px;background:rgba(0,0,0,0.6);border-top:1px solid rgba('+rgbStr+',0.3)">';
+  html += '<div style="display:flex;gap:5px;padding:7px 8px;background:rgba(0,0,0,0.7);border-top:1px solid rgba('+rgbStr+',0.3);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">';
   region.teams.forEach(function(tn) {
     var d = wvGetTeamData(tn);
     var mgr = d.mgr;
-    var BASE2 = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
-    html += '<div style="flex:1;min-width:110px;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.4);border-radius:8px;padding:6px 8px;border:1px solid rgba('+rgbStr+',0.25);cursor:pointer" onclick="wvShowTeamDetail(\''+tn.replace(/'/g,'\\x27')+'\')">';
-    if (mgr.crest) html += '<img src="'+BASE2+mgr.crest+'" style="width:22px;height:22px;object-fit:contain;border-radius:3px;flex-shrink:0">';
-    html += '<div style="min-width:0"><div style="font-family:Cinzel,serif;font-size:9px;font-weight:700;color:'+region.color+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+tn.split(' ')[0]+'</div>';
-    html += '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim)">'+d.w+'-'+d.l+' · '+d.questCount+' Q · $'+d.totalFaab+'</div></div>';
+    html += '<div style="flex:0 0 auto;display:flex;align-items:center;gap:5px;background:rgba(0,0,0,0.45);border-radius:7px;padding:5px 7px;border:1px solid rgba('+rgbStr+',0.2);cursor:pointer" onclick="wvShowTeamDetail(\''+tn.replace(/'/g,"\\x27")+'\')">';
+    if (mgr.crest) html += '<img src="'+BASE+mgr.crest+'" style="width:18px;height:18px;object-fit:contain;border-radius:3px;flex-shrink:0">';
+    html += '<div><div style="font-family:Cinzel,serif;font-size:8px;font-weight:700;color:'+region.color+';white-space:nowrap">'+tn.split(' ')[0]+'</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:7px;color:var(--dim)">'+d.w+'-'+d.l+' · $'+d.totalFaab+'</div></div>';
     html += '</div>';
   });
   html += '</div>';
