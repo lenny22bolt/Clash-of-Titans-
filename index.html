@@ -181,6 +181,15 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
 @keyframes wv-npc-idle-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
 @keyframes wv-npc-aura{0%,100%{opacity:0.4;transform:scale(0.9)}50%{opacity:0.9;transform:scale(1.3)}}
 @keyframes wv-npc-pause-burst{0%{transform:scale(0);opacity:1}100%{transform:scale(2.5);opacity:0}}
+/* Biome particle keyframes — translated from Unity BiomeEnvironmentController.cs */
+@keyframes wvDustFloat{0%{transform:translate(0,0);opacity:0}10%{opacity:1}80%{opacity:0.6}100%{transform:translate(var(--pdx,8px),var(--pdy,-30px));opacity:0}}
+@keyframes wvSandDrift{0%{transform:translateX(0);opacity:0}10%{opacity:1}90%{opacity:0.4}100%{transform:translateX(60px);opacity:0}}
+@keyframes wvSnowFall{0%{transform:translate(0,0) rotate(0deg);opacity:0}5%{opacity:0.85}90%{opacity:0.6}100%{transform:translate(var(--pdx,5px),110px) rotate(180deg);opacity:0}}
+@keyframes wvMistDrift{0%,100%{transform:translate(0,0) scale(1);opacity:var(--pop,0.08)}50%{transform:translate(15px,-10px) scale(1.1);opacity:calc(var(--pop,0.08)*1.4)}}
+@keyframes wvLeafFloat{0%{transform:translate(0,0) rotate(0deg);opacity:0}8%{opacity:0.7}85%{opacity:0.5}100%{transform:translate(var(--pdx,20px),var(--pdy,10px)) rotate(270deg);opacity:0}}
+@keyframes wvEmberRise{0%{transform:translate(0,0) scale(1);opacity:0.9}60%{opacity:0.7}100%{transform:translate(var(--pdx,5px),-60px) scale(0.3);opacity:0}}
+@keyframes wvAshFall{0%{transform:translate(0,0);opacity:0}8%{opacity:0.4}90%{opacity:0.2}100%{transform:translate(var(--pdx,5px),100px);opacity:0}}
+@keyframes wvSmokeDrift{0%,100%{transform:translate(0,0) scale(1);opacity:var(--pop,0.08)}50%{transform:translate(-10px,-20px) scale(1.15);opacity:calc(var(--pop,0.08)*1.3)}}
 @keyframes wv-ember{0%{transform:translateY(0) translateX(0);opacity:1}100%{transform:translateY(-60px) translateX(var(--wv-ex,10px));opacity:0}}
 @keyframes wv-snow{0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:.9}100%{transform:translateY(80px) translateX(var(--wv-sx,8px)) rotate(360deg);opacity:0}}
 @keyframes wv-sparkle{0%,100%{opacity:0;transform:scale(0)}50%{opacity:1;transform:scale(1)}}
@@ -2873,23 +2882,101 @@ function wvGetTeamData(teamName) {
 }
 
 function wvBuildParticles(terrain, count) {
+  // Translated from Unity BiomeEnvironmentController.cs
+  // Each biome has 3 layered effects matching exact Unity particle params
   var html = '';
-  for (var i=0; i<count; i++) {
-    var x = Math.random()*100, delay = Math.random()*4, dur = 2+Math.random()*3;
-    if (terrain === 'lava') {
-      var dx = (Math.random()-0.5)*30;
-      html += '<div style="position:absolute;left:'+x+'%;bottom:'+Math.random()*40+'%;width:'+(3+Math.random()*4)+'px;height:'+(3+Math.random()*4)+'px;border-radius:50%;background:radial-gradient(#FFD580,#FF6B6B);--wv-ex:'+dx+'px;animation:wv-ember '+(dur)+'s '+delay+'s ease-out infinite;pointer-events:none;z-index:2"></div>';
-    } else if (terrain === 'ice') {
-      var sx = (Math.random()-0.5)*20;
-      html += '<div style="position:absolute;left:'+x+'%;top:'+(Math.random()*30)+'%;width:'+(2+Math.random()*3)+'px;height:'+(2+Math.random()*3)+'px;border-radius:50%;background:rgba(184,240,255,0.9);--wv-sx:'+sx+'px;animation:wv-snow '+(dur+1)+'s '+delay+'s linear infinite;pointer-events:none;z-index:2"></div>';
-    } else if (terrain === 'forest') {
-      html += '<div style="position:absolute;left:'+x+'%;top:'+Math.random()*60+'%;width:4px;height:4px;background:rgba(144,238,144,0.6);border-radius:50%;animation:wv-sparkle '+(1+Math.random()*2)+'s '+delay+'s ease-in-out infinite;pointer-events:none;z-index:2"></div>';
-    } else if (terrain === 'desert') {
-      html += '<div style="position:absolute;left:'+x+'%;top:'+Math.random()*80+'%;width:'+(1+Math.random()*2)+'px;height:'+(1+Math.random()*2)+'px;background:rgba(255,213,128,0.5);border-radius:50%;animation:wv-sparkle '+(2+Math.random()*3)+'s '+delay+'s ease-in-out infinite;pointer-events:none;z-index:2"></div>';
+  var i, x, y, delay, dur, size, dx, dy, op;
+
+  if (terrain === 'desert') {
+    // Layer 1: Golden Dust (rate:20, colorA:#FFD147/0.45, colorB:#FFF28C/0.15, velY:up)
+    for (i = 0; i < 18; i++) {
+      x = Math.random()*100; y = 20+Math.random()*70; delay = Math.random()*6;
+      dur = 5+Math.random()*7; size = 2+Math.random()*4; op = 0.25+Math.random()*0.35;
+      dx = (Math.random()-0.5)*16; dy = -(3+Math.random()*8);
+      html += '<div style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+size+'px;height:'+size+'px;border-radius:50%;background:rgba(255,209,71,'+op+');pointer-events:none;z-index:3;animation:wvDustFloat '+dur+'s '+delay+'s ease-in-out infinite" data-dx="'+dx+'" data-dy="'+dy+'"></div>';
+    }
+    // Layer 2: Oasis Sparkles (rate:8, colorA:cyan/0.65, colorB:gold/0.45 — teal glints)
+    for (i = 0; i < 10; i++) {
+      x = Math.random()*100; y = 10+Math.random()*80; delay = Math.random()*5;
+      dur = 1.5+Math.random()*3; size = 2+Math.random()*3; op = 0.4+Math.random()*0.4;
+      html += '<div style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+size+'px;height:'+size+'px;border-radius:50%;background:rgba(64,242,255,'+op+');box-shadow:0 0 '+(size*2)+'px rgba(64,242,255,0.6);pointer-events:none;z-index:3;animation:wv-sparkle '+dur+'s '+delay+'s ease-in-out infinite"></div>';
+    }
+    // Layer 3: Warm Sand Wind (rate:14, horizontal drift right, amber/sandy)
+    for (i = 0; i < 14; i++) {
+      x = Math.random()*100; y = 30+Math.random()*60; delay = Math.random()*4;
+      dur = 3+Math.random()*5; size = 1+Math.random()*3; op = 0.12+Math.random()*0.18;
+      html += '<div style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+(size*4)+'px;height:'+size+'px;border-radius:2px;background:rgba(242,158,51,'+op+');pointer-events:none;z-index:2;animation:wvSandDrift '+dur+'s '+delay+'s linear infinite"></div>';
+    }
+
+  } else if (terrain === 'ice') {
+    // Layer 1: Snowfall (rate:55, white/blue, falls down with slight horizontal drift)
+    for (i = 0; i < 30; i++) {
+      x = Math.random()*110-5; y = -5+Math.random()*30; delay = Math.random()*6;
+      dur = 4+Math.random()*6; size = 2+Math.random()*4; op = 0.5+Math.random()*0.4;
+      dx = (Math.random()-0.5)*12;
+      html += '<div style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+size+'px;height:'+size+'px;border-radius:50%;background:rgba(255,255,255,'+op+');pointer-events:none;z-index:3;animation:wvSnowFall '+dur+'s '+delay+'s linear infinite" data-dx="'+dx+'"></div>';
+    }
+    // Layer 2: Frost Mist (rate:9, large soft blue-white blobs, slow drift)
+    for (i = 0; i < 8; i++) {
+      x = Math.random()*100; y = 20+Math.random()*70; delay = Math.random()*5;
+      dur = 8+Math.random()*6; size = 30+Math.random()*50; op = 0.06+Math.random()*0.1;
+      html += '<div style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+size+'px;height:'+(size*0.6)+'px;border-radius:50%;background:rgba(178,242,255,'+op+');filter:blur('+(size*0.3)+'px);pointer-events:none;z-index:2;animation:wvMistDrift '+dur+'s '+delay+'s ease-in-out infinite"></div>';
+    }
+    // Layer 3: Crystal Glints (rate:10, bright blue sparkle points)
+    for (i = 0; i < 12; i++) {
+      x = Math.random()*100; y = 10+Math.random()*85; delay = Math.random()*4;
+      dur = 1+Math.random()*2.5; size = 2+Math.random()*3; op = 0.5+Math.random()*0.4;
+      html += '<div style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+size+'px;height:'+size+'px;border-radius:50%;background:rgba(51,191,255,'+op+');box-shadow:0 0 '+(size*3)+'px rgba(51,191,255,0.7);pointer-events:none;z-index:3;animation:wv-sparkle '+dur+'s '+delay+'s ease-in-out infinite"></div>';
+    }
+
+  } else if (terrain === 'forest') {
+    // Layer 1: Floating Leaves (rate:20, green/yellow-green, drift sideways + gentle rise/fall)
+    for (i = 0; i < 18; i++) {
+      x = Math.random()*110-5; y = 5+Math.random()*80; delay = Math.random()*5;
+      dur = 4+Math.random()*6; size = 4+Math.random()*6; op = 0.45+Math.random()*0.3;
+      dx = (Math.random()-0.5)*28; dy = (Math.random()-0.3)*8;
+      var leafColor = Math.random() > 0.5 ? ('rgba(64,230,64,'+op+')') : ('rgba(204,255,64,'+op+')');
+      html += '<div style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+size+'px;height:'+(size*0.6)+'px;border-radius:50% 0;background:'+leafColor+';transform:rotate('+(Math.random()*360)+'deg);pointer-events:none;z-index:3;animation:wvLeafFloat '+dur+'s '+delay+'s ease-in-out infinite"></div>';
+    }
+    // Layer 2: Forest Fireflies (rate:14, bright green glowing dots, bob slowly)
+    for (i = 0; i < 14; i++) {
+      x = Math.random()*100; y = 10+Math.random()*85; delay = Math.random()*5;
+      dur = 1.5+Math.random()*3; size = 2+Math.random()*3; op = 0.6+Math.random()*0.35;
+      html += '<div style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+size+'px;height:'+size+'px;border-radius:50%;background:rgba(26,255,140,'+op+');box-shadow:0 0 '+(size*4)+'px rgba(26,255,140,0.7);pointer-events:none;z-index:3;animation:wv-sparkle '+dur+'s '+delay+'s ease-in-out infinite"></div>';
+    }
+    // Layer 3: Waterfall Mist (rate:10, large teal-white soft blobs, gentle upward drift)
+    for (i = 0; i < 7; i++) {
+      x = 55+Math.random()*35; y = 5+Math.random()*50; delay = Math.random()*4;
+      dur = 6+Math.random()*6; size = 25+Math.random()*40; op = 0.08+Math.random()*0.1;
+      html += '<div style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+size+'px;height:'+(size*0.7)+'px;border-radius:50%;background:rgba(140,255,230,'+op+');filter:blur('+(size*0.35)+'px);pointer-events:none;z-index:2;animation:wvMistDrift '+dur+'s '+delay+'s ease-in-out infinite"></div>';
+    }
+
+  } else if (terrain === 'lava') {
+    // Layer 1: Lava Embers (rate:36, orange/red, rise upward fast)
+    for (i = 0; i < 24; i++) {
+      x = Math.random()*100; y = 20+Math.random()*75; delay = Math.random()*4;
+      dur = 1.5+Math.random()*3; size = 2+Math.random()*4; op = 0.7+Math.random()*0.25;
+      dx = (Math.random()-0.5)*20; dy = -(15+Math.random()*30);
+      html += '<div style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+size+'px;height:'+size+'px;border-radius:50%;background:rgba(255,64,0,'+op+');box-shadow:0 0 '+(size*2)+'px rgba(255,200,38,0.7);pointer-events:none;z-index:3;animation:wvEmberRise '+dur+'s '+delay+'s ease-out infinite"></div>';
+    }
+    // Layer 2: Volcanic Ash (rate:28, dark grey, slow downward fall with slight drift)
+    for (i = 0; i < 20; i++) {
+      x = Math.random()*110-5; y = -5+Math.random()*40; delay = Math.random()*5;
+      dur = 5+Math.random()*6; size = 2+Math.random()*4; op = 0.2+Math.random()*0.3;
+      dx = (Math.random()-0.5)*18; 
+      html += '<div style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+size+'px;height:'+size+'px;border-radius:50%;background:rgba(20,20,20,'+op+');pointer-events:none;z-index:3;animation:wvAshFall '+dur+'s '+delay+'s linear infinite" data-dx="'+dx+'"></div>';
+    }
+    // Layer 3: Smoke Haze (rate:12, large near-black soft blobs, slow rise)
+    for (i = 0; i < 8; i++) {
+      x = Math.random()*100; y = 30+Math.random()*60; delay = Math.random()*5;
+      dur = 8+Math.random()*8; size = 40+Math.random()*60; op = 0.08+Math.random()*0.1;
+      html += '<div style="position:absolute;left:'+x+'%;top:'+y+'%;width:'+size+'px;height:'+(size*0.65)+'px;border-radius:50%;background:rgba(13,13,13,'+op+');filter:blur('+(size*0.4)+'px);pointer-events:none;z-index:2;animation:wvSmokeDrift '+dur+'s '+delay+'s ease-in-out infinite"></div>';
     }
   }
   return html;
 }
+
+
 
 function wvBuildTerrainElements(terrain, color) {
   var html = '';
@@ -3192,6 +3279,16 @@ function renderZoomedRegion(region) {
   html += '</div>';
 
   zoomed.innerHTML = html;
+
+  // Inject per-particle CSS velocity vars (translates Unity velocityX/Y ranges)
+  setTimeout(function() {
+    zoomed.querySelectorAll('[data-dx]').forEach(function(el) {
+      el.style.setProperty('--pdx', el.getAttribute('data-dx')+'px');
+    });
+    zoomed.querySelectorAll('[data-dy]').forEach(function(el) {
+      el.style.setProperty('--pdy', el.getAttribute('data-dy')+'px');
+    });
+  }, 10);
 
   // Start JS NPC roamers after DOM is set
   setTimeout(wvStartNPCRoamers, 100);
