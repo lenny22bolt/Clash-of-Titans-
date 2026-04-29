@@ -3016,13 +3016,13 @@ function wvBuildNPC(teamName, terrain, color, pathIdx, npcImage) {
 }
 
 function wvNPCFigureHTML(mgr, color, BASE, npcImage) {
-  var charSrc = npcImage ? BASE + npcImage : '';
+  var charSrc = npcImage ? BASE + npcImage + '?v=2' : '';
   var crestSrc = mgr && mgr.crest ? BASE + mgr.crest : '';
-  var html = '<div class="wv-npc-inner" style="position:relative;width:52px;height:68px">';
+  var html = '<div class="wv-npc-inner" style="position:relative;width:52px;height:68px;background:transparent">';
   html += '<div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);width:32px;height:8px;background:rgba(0,0,0,0.5);border-radius:50%;filter:blur(3px)"></div>';
   html += '<div class="wv-npc-aura" style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:40px;height:14px;background:'+color+';border-radius:50%;filter:blur(6px);opacity:0.45;animation:wv-npc-aura 2s ease-in-out infinite"></div>';
   if (charSrc) {
-    html += '<img src="'+charSrc+'" class="wv-npc-body-img" style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);width:46px;height:54px;object-fit:contain;animation:wv-npc-bob 1.1s ease-in-out infinite" onerror="this.remove()">';
+    html += '<img src="'+charSrc+'" class="wv-npc-body-img" style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);width:46px;height:54px;object-fit:contain;background:transparent;mix-blend-mode:normal;animation:wv-npc-bob 1.1s ease-in-out infinite" onerror="this.remove()">';
   } else {
     html += '<div class="wv-npc-arm-l" style="position:absolute;bottom:20px;left:3px;width:6px;height:12px;background:'+color+';border-radius:3px;opacity:0.8;transform-origin:top center"></div>';
     html += '<div class="wv-npc-arm-r" style="position:absolute;bottom:20px;right:3px;width:6px;height:12px;background:'+color+';border-radius:3px;opacity:0.8;transform-origin:top center"></div>';
@@ -3033,7 +3033,7 @@ function wvNPCFigureHTML(mgr, color, BASE, npcImage) {
   if (crestSrc) {
     html += '<div style="position:absolute;top:-2px;left:50%;transform:translateX(-50%);animation:wv-npc-bob 1.6s ease-in-out infinite 0.3s">';
     html += '<div style="width:20px;height:20px;border-radius:50%;border:2px solid '+color+';box-shadow:0 0 8px '+color+';background:rgba(5,13,21,0.9);overflow:hidden">';
-    html += '<img src="'+crestSrc+'" style="width:100%;height:100%;object-fit:contain" onerror="this.remove()">';
+    html += '<img src="'+crestSrc+'" style="width:100%;height:100%;object-fit:contain;background:transparent" onerror="this.remove()">';
     html += '</div></div>';
   }
   html += '</div>';
