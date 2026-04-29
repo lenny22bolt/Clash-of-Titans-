@@ -2997,10 +2997,10 @@ function wvBuildNPC(teamName, terrain, color, pathIdx, npcImage) {
   var BASE = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
   var mgr = MANAGERS.find(function(m){ return m.name === teamName; }) || {};
   var waypointSets = [
-    [[12,48],[22,42],[18,56],[30,50],[12,48]],
-    [[55,34],[68,30],[72,42],[60,40],[55,34]],
-    [[18,62],[28,68],[24,75],[14,70],[18,62]],
-    [[58,60],[70,65],[65,72],[54,68],[58,60]]
+    [[40,18],[55,14],[60,22],[45,26],[40,18]],   // #1 top center patrol
+    [[12,58],[22,52],[18,65],[28,60],[12,58]],   // #2 bottom left patrol
+    [[42,62],[52,58],[55,68],[44,72],[42,62]],   // #3 bottom center patrol
+    [[68,58],[78,54],[82,64],[72,68],[68,58]]    // #4 bottom right patrol
   ];
   var wps = waypointSets[pathIdx % waypointSets.length];
   var startWp = wps[0];
@@ -3116,12 +3116,12 @@ function renderZoomedRegion(region) {
   var BASE = 'https://lenny22bolt.github.io/Clash-of-Titans-/';
   var bgUrl = BASE + (region.bgImage || 'realm-north.png');
 
-  // Teams spread across the full village — 4 corners of the scene
+  // 1 top center + 3 bottom row layout
   var villagePositions = [
-    {left:'25%', top:'22%'},
-    {left:'72%', top:'25%'},
-    {left:'22%', top:'65%'},
-    {left:'70%', top:'68%'}
+    {left:'50%', top:'22%'},   // #1 top center
+    {left:'20%', top:'65%'},   // #2 bottom left
+    {left:'50%', top:'70%'},   // #3 bottom center
+    {left:'80%', top:'65%'}    // #4 bottom right
   ];
 
   var html = '<div style="position:relative;width:100%;padding-bottom:75%;overflow:hidden;border-radius:14px 14px 0 0">';
@@ -3174,15 +3174,15 @@ function renderZoomedRegion(region) {
   html += '<div id="wvTeamPanel" style="position:absolute;bottom:0;left:0;right:0;z-index:20;display:none"></div>';
   html += '</div>';
 
-  // Bottom stats — horizontal scroll
+  // Bottom stats — true single-row horizontal scroll
   var rgbStr = region.color==='#7BB8E8'?'123,184,232':region.color==='#6EDE7E'?'110,222,126':region.color==='#FF6B6B'?'255,107,107':'255,213,128';
-  html += '<div style="display:flex;gap:5px;padding:7px 8px;background:rgba(0,0,0,0.7);border-top:1px solid rgba('+rgbStr+',0.3);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none">';
+  html += '<div style="display:flex;flex-wrap:nowrap;gap:5px;padding:7px 8px;background:rgba(0,0,0,0.7);border-top:1px solid rgba('+rgbStr+',0.3);overflow-x:scroll;-webkit-overflow-scrolling:touch;scrollbar-width:none;min-width:0">';
   region.teams.forEach(function(tn) {
     var d = wvGetTeamData(tn);
     var mgr = d.mgr;
-    html += '<div style="flex:0 0 auto;display:flex;align-items:center;gap:5px;background:rgba(0,0,0,0.45);border-radius:7px;padding:5px 7px;border:1px solid rgba('+rgbStr+',0.2);cursor:pointer" onclick="wvShowTeamDetail(\''+tn.replace(/'/g,"\\x27")+'\')">';
+    html += '<div style="flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;background:rgba(0,0,0,0.45);border-radius:7px;padding:5px 8px;border:1px solid rgba('+rgbStr+',0.2);cursor:pointer;white-space:nowrap" onclick="wvShowTeamDetail(\''+tn.replace(/'/g,"\\x27")+'\')">';
     if (mgr.crest) html += '<img src="'+BASE+mgr.crest+'" style="width:18px;height:18px;object-fit:contain;border-radius:3px;flex-shrink:0">';
-    html += '<div><div style="font-family:Cinzel,serif;font-size:8px;font-weight:700;color:'+region.color+';white-space:nowrap">'+tn.split(' ')[0]+'</div>';
+    html += '<div style="white-space:nowrap"><div style="font-family:Cinzel,serif;font-size:8px;font-weight:700;color:'+region.color+'">'+tn.split(' ')[0]+'</div>';
     html += '<div style="font-family:Cinzel,serif;font-size:7px;color:var(--dim)">'+d.w+'-'+d.l+' · $'+d.totalFaab+'</div></div>';
     html += '</div>';
   });
