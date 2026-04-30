@@ -2022,7 +2022,7 @@ var MANAGERS = [
   {name:"Talon",                   username:"HiLine",           emoji:"🪄", paid:true,  crest:"crest-talon.png"},
   {name:"ChatG-TDs",               username:"SteveG25",         emoji:"🤖", paid:true,  crest:"crest-chatg.png"},
   {name:"Dewie Slayer of Bakunawa",username:"dewdaddy",         emoji:"🐍", paid:true,  crest:"crest-dewie.png"},
-  {name:"Son of Rander",           username:"JTree12",          emoji:"🌳", paid:true,  crest:"crest-sonrander.png"},
+  {name:"Son of Rander",           username:"JTree12",          emoji:"🌳", paid:false,  crest:"crest-sonrander.png"},
   {name:"Heir of Zeus",            username:"lennylee22",       emoji:"⚡", paid:true,  crest:"crest-heirofzeus.png"}
 ];
 
@@ -4908,6 +4908,474 @@ async function runWeeklyQuestAudit(weekNum) {
   if (results) results.innerHTML = '';
 
   try {
+    var matchupData   = await safeFetch('/league/' + LID + '/matchups/' + weekNum);
+    var transData     = await safeFetch('/league/' + LID + '/transactions/' + weekNum);
+    var rostData      = S.rosters || [];
+    var playersCache  = JSON.parse(localStorage.getItem('nflPlayers') || '{}');
+
+    if (!matchupData) throw new Error('Could not fetch matchup data from Sleeper');
+
+    // Build matchup pairs
+    var games = {};
+    matchupData.forEach(function(m) {
+      if (!games[m.matchup_id]) games[m.matchup_id] = [];
+      games[m.matchup_id].push(m);
+    });
+
+    var teamMatchups = {};
+    Object.values(games).forEach(function(pair) {
+      if (pair.length !== 2) return;
+      var a = pair[0], b = pair[1];
+      var rA = rostData.find(function(r){ return r.roster_id === a.roster_id; });
+      var rB = rostData.find(function(r){ return r.roster_id === b.roster_id; });
+      if (!rA || !rB) return;
+      var nA = resolveTeamName(rA, getUser(rA.owner_id));
+      var nB = resolveTeamName(rB, getUser(rB.owner_id));
+      var pA = a.points || 0, pB = b.points || 0;
+      var startersA = a.starters || [], startersB = b.starters || [];
+      var playerScoresA = a.players_points || {}, playerScoresB = b.players_points || {};
+      teamMatchups[nA] = { team:nA, opp:nB, pts:pA, oppPts:pB, won:pA>pB, margin:Math.abs(pA-pB), starters:startersA, playerScores:playerScoresA, benchPlayers:(a.players||[]).filter(function(p){ return startersA.indexOf(p)===-1; }), roster:rA };
+      teamMatchups[nB] = { team:nB, opp:nA, pts:pB, oppPts:pA, won:pB>pA, margin:Math.abs(pA-pB), starters:startersB, playerScores:playerScoresB, benchPlayers:(b.players||[]).filter(function(p){ return startersB.indexOf(p)===-1; }), roster:rB };
+    });
+
+    // ── CLIENT-SIDE AUTO-DETECTION ───────────────────────────────────────
+    if (status) status.textContent = '⚡ Running auto-detection...';
+    var autoDetected = clientSideQuestDetect(teamMatchups, transData, rostData, weekNum, playersCache);
+    // Update prog bars on quest cards
+    updateQuestProgressBars(teamMatchups, transData, rostData, weekNum, playersCache);
+
+    if (status) status.textContent = '🤖 Claude is analyzing remaining quests...';
+
+    // Build trans summary for Claude
+    var transSummary = '';
+    if (transData && transData.length) {
+      transData.slice(0, 30).forEach(function(t) {
+        if (t.type === 'waiver') {
+          var adds = (t.adds ? Object.keys(t.adds) : []).map(function(pid){ var p = playersCache[pid]; return p ? p.full_name : pid; });
+          var drops = (t.drops ? Object.keys(t.drops) : []).map(function(pid){ var p = playersCache[pid]; return p ? p.full_name : pid; });
+          var rId = t.roster_ids && t.roster_ids[0];
+          var rr = rostData.find(function(r){ return r.roster_id === rId; });
+          var tn = rr ? resolveTeamName(rr, getUser(rr.owner_id)) : 'Unknown';
+          var bid = t.settings && t.settings.waiver_bid !== undefined ? '$' + t.settings.waiver_bid : '';
+          transSummary += tn + ' added ' + adds.join(', ') + (drops.length ? ' dropped ' + drops.join(', ') : '') + (bid ? ' bid:' + bid : '') + '\n';
+        } else if (t.type === 'trade') {
+          var traders = (t.roster_ids||[]).map(function(rid){ var rr = rostData.find(function(r){ return r.roster_id === rid; }); return rr ? resolveTeamName(rr, getUser(rr.owner_id)) : 'Unknown'; });
+          transSummary += 'TRADE: ' + traders.join(' + ') + '\n';
+        }
+      });
+    }
+
+    var standingsCtx = '';
+    rostData.forEach(function(r) {
+      var tn = resolveTeamName(r, getUser(r.owner_id));
+      var w = r.settings && r.settings.wins || 0;
+      var l = r.settings && r.settings.losses || 0;
+      var pf = r.settings && r.settings.fpts || 0;
+      standingsCtx += tn + ': ' + w + '-' + l + ' PF:' + pf + '\n';
+    });
+
+    // Only send commissioner-verified quests to Claude
+    var questList = QUESTS.filter(function(q){ return q.status !== 'locked' && q.trigger && q.trigger.indexOf('Commissioner') !== -1; }).map(function(q){
+      return q.id + ' | ' + q.title + ' | $' + q.reward + ' | ' + (q.repeat ? 'REPEAT' : 'ONE-TIME') + ' | ' + q.desc;
+    }).join('\n');
+
+    var autoIds = autoDetected.map(function(a){ return a.questId; });
+
+    var matchupSummary = Object.values(teamMatchups).map(function(m) {
+      var starterScores = m.starters.map(function(pid) {
+        var p = playersCache[pid]; var pts = m.playerScores[pid] || 0;
+        return (p ? p.full_name + '(' + (p.position||'?') + ')' : pid) + ':' + pts;
+      }).join(', ');
+      var benchScores = m.benchPlayers.slice(0,5).map(function(pid) {
+        var p = playersCache[pid]; var pts = m.playerScores[pid] || 0;
+        return (p ? p.full_name + '(' + (p.position||'?') + ')' : pid) + ':' + pts;
+      }).join(', ');
+      return m.team + ' vs ' + m.opp + ' | Score:' + m.pts.toFixed(1) + ' OppScore:' + m.oppPts.toFixed(1) + ' | ' + (m.won?'WON':'LOST') + ' by ' + m.margin.toFixed(2) + '\nStarters: ' + starterScores + '\nBench: ' + benchScores;
+    }).join('\n\n');
+
+    var prompt = 'You are the Co-Commissioner AI for Clash of Titans dynasty fantasy football league.\n\n'
+      + 'WEEK ' + weekNum + ' DATA:\n\n'
+      + '=== MATCHUPS & SCORES ===\n' + matchupSummary + '\n\n'
+      + '=== TRANSACTIONS ===\n' + (transSummary || 'None') + '\n\n'
+      + '=== STANDINGS ===\n' + standingsCtx + '\n\n'
+      + 'NOTE: The following quests were already auto-detected and do NOT need to be re-checked: ' + autoIds.join(', ') + '\n\n'
+      + '=== COMMISSIONER-VERIFIED QUESTS ONLY (check these) ===\n' + questList + '\n\n'
+      + 'TASK: Only check the commissioner-verified quests above. Flag any that might have been completed.\n'
+      + 'Return ONLY a valid JSON array:\n'
+      + '[{"manager":"Team Name","questId":"q_id","questTitle":"Title","faab":2,"evidence":"reason","needsVerify":true}]\n'
+      + 'Return [] if none found. NO other text.';
+
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] })
+    });
+
+    var data = await response.json();
+    var text = data.content && data.content[0] && data.content[0].text || '[]';
+    var clean = text.replace(/```json|```/g, '').trim();
+    var aiCompletions = JSON.parse(clean);
+
+    // Merge auto-detected + AI-flagged
+    var allCompletions = autoDetected.concat(aiCompletions);
+
+    if (status) status.textContent = '✅ Auto-detected: ' + autoDetected.length + ' · AI flagged: ' + aiCompletions.length + ' · Total: ' + allCompletions.length;
+    renderAuditResults(allCompletions, weekNum);
+
+  } catch(e) {
+    console.error('Audit failed:', e);
+    if (status) { status.textContent = '⚠ Audit failed: ' + e.message; status.style.color = 'var(--red)'; }
+  }
+
+  if (btn) { btn.disabled = false; btn.textContent = '🤖 Run Week ' + weekNum + ' Audit'; }
+}
+
+// ── CLIENT-SIDE QUEST AUTO-DETECTION ─────────────────────────────────────────
+function clientSideQuestDetect(teamMatchups, transData, rostData, weekNum, playersCache) {
+  var detected = [];
+  var allTeams = Object.values(teamMatchups);
+  if (!allTeams.length) return detected;
+
+  // Helper: add detection
+  function detect(team, questId, evidence) {
+    var q = QUESTS.find(function(q){ return q.id === questId; });
+    if (!q) return;
+    detected.push({ manager: team, questId: questId, questTitle: q.title, faab: q.reward, evidence: evidence, needsVerify: false });
+  }
+
+  // All scores sorted for league-wide comparisons
+  var allScores = allTeams.map(function(t){ return { team: t.team, pts: t.pts }; }).sort(function(a,b){ return b.pts - a.pts; });
+  var topScore = allScores[0];
+  var bottomScore = allScores[allScores.length - 1];
+
+  // All bench scores for bench burner
+  var allBenchScores = [];
+  allTeams.forEach(function(t) {
+    t.benchPlayers.forEach(function(pid) {
+      var pts = t.playerScores[pid] || 0;
+      allBenchScores.push({ team: t.team, pid: pid, pts: pts });
+    });
+  });
+  var topBench = allBenchScores.sort(function(a,b){ return b.pts-a.pts; })[0];
+
+  // All TE scores
+  var allTEScores = [];
+  allTeams.forEach(function(t) {
+    t.starters.forEach(function(pid) {
+      var p = playersCache[pid];
+      if (p && p.position === 'TE') {
+        allTEScores.push({ team: t.team, pid: pid, pts: t.playerScores[pid] || 0, name: p.full_name });
+      }
+    });
+  });
+  var topTE = allTEScores.sort(function(a,b){ return b.pts-a.pts; })[0];
+
+  // All K scores
+  var allKScores = [];
+  allTeams.forEach(function(t) {
+    t.starters.forEach(function(pid) {
+      var p = playersCache[pid];
+      if (p && p.position === 'K') {
+        allKScores.push({ team: t.team, pid: pid, pts: t.playerScores[pid] || 0, name: p.full_name });
+      }
+    });
+  });
+  var topK = allKScores.sort(function(a,b){ return b.pts-a.pts; })[0];
+
+  allTeams.forEach(function(t) {
+    var wins = t.roster && t.roster.settings ? (t.roster.settings.wins || 0) : 0;
+    var losses = t.roster && t.roster.settings ? (t.roster.settings.losses || 0) : 0;
+
+    // q_mightiest: highest scorer
+    if (topScore && t.team === topScore.team) detect(t.team, 'q_mightiest', t.team + ' scored ' + t.pts.toFixed(2) + ' — highest in the league');
+
+    // q_basement: lowest scorer
+    if (bottomScore && t.team === bottomScore.team) detect(t.team, 'q_basement', t.team + ' scored ' + t.pts.toFixed(2) + ' — lowest in the league');
+
+    // q_benchburner: highest bench player
+    if (topBench && t.team === topBench.team) {
+      var bp = playersCache[topBench.pid];
+      detect(t.team, 'q_benchburner', (bp ? bp.full_name : topBench.pid) + ' scored ' + topBench.pts.toFixed(2) + ' on bench — highest bench score in league');
+    }
+
+    // q_teterror: highest TE
+    if (topTE && t.team === topTE.team) detect(t.team, 'q_teterror', topTE.name + ' scored ' + topTE.pts.toFixed(2) + ' — top TE in league');
+
+    // q_goldenboot: highest K
+    if (topK && t.team === topK.team) detect(t.team, 'q_goldenboot', topK.name + ' scored ' + topK.pts.toFixed(2) + ' — top kicker in league');
+
+    // q_bloodbath: win by 50+
+    if (t.won && t.margin >= 50) detect(t.team, 'q_bloodbath', t.team + ' won by ' + t.margin.toFixed(2) + ' pts');
+
+    // q_fortress: hold opp under 100 and win
+    if (t.won && t.oppPts < 100) detect(t.team, 'q_fortress', t.team + ' held ' + t.opp + ' to ' + t.oppPts.toFixed(2) + ' pts and won');
+
+    // q_lightning: any starter scores 40+
+    t.starters.forEach(function(pid) {
+      var pts = t.playerScores[pid] || 0;
+      if (pts >= 40) {
+        var p = playersCache[pid];
+        detect(t.team, 'q_lightning', (p ? p.full_name : pid) + ' scored ' + pts.toFixed(2) + ' pts');
+      }
+    });
+
+    // q_razor: win by less than 1 point
+    if (t.won && t.margin < 1) detect(t.team, 'q_razor', t.team + ' won by just ' + t.margin.toFixed(2) + ' pts');
+
+    // q_robbed: top 5 scorer but lost
+    var rank = allScores.findIndex(function(s){ return s.team === t.team; }) + 1;
+    if (rank <= 5 && !t.won) detect(t.team, 'q_robbed', t.team + ' scored ' + t.pts.toFixed(2) + ' (#' + rank + ' in league) but lost to ' + t.opp);
+
+    // q_divblood: win a division matchup
+    var oppDiv = TEAM_DIVISIONS[t.opp];
+    var myDiv  = TEAM_DIVISIONS[t.team];
+    if (t.won && oppDiv && myDiv && oppDiv === myDiv) detect(t.team, 'q_divblood', t.team + ' beat division rival ' + t.opp);
+
+    // q_bounce: win after 3+ loss streak (needs standings)
+    if (t.won && losses >= 3 && wins === 0) detect(t.team, 'q_bounce', t.team + ' won after a ' + losses + '-game losing streak');
+
+    // q_giant: beat a team with 3+ more wins
+    var oppRoster = rostData.find(function(r){ var n = resolveTeamName(r, getUser(r.owner_id)); return n === t.opp; });
+    var oppWins = oppRoster && oppRoster.settings ? (oppRoster.settings.wins || 0) : 0;
+    if (t.won && (oppWins - wins) >= 3) detect(t.team, 'q_giant', t.team + ' (' + wins + ' wins) beat ' + t.opp + ' (' + oppWins + ' wins)');
+
+    // q_showup: first win ever this season
+    if (t.won && wins === 0 && losses > 0) detect(t.team, 'q_showup', t.team + ' recorded their first win of the season');
+
+    // q_faststart: win first 3 games (wins=2 going to 3)
+    if (t.won && wins === 2 && losses === 0) detect(t.team, 'q_faststart', t.team + ' won their first 3 games of the season');
+
+    // q_rookiexp: rookie scores 30+
+    t.starters.forEach(function(pid) {
+      var p = playersCache[pid];
+      var pts = t.playerScores[pid] || 0;
+      if (p && p.years_exp === 0 && pts >= 30) {
+        detect(t.team, 'q_rookiexp', (p.full_name || pid) + ' (rookie) scored ' + pts.toFixed(2) + ' pts');
+      }
+    });
+  });
+
+  // Transaction-based quests
+  if (transData && transData.length) {
+    var teamWaiverCounts = {}, teamDropCounts = {}, teamTradeCount = {};
+
+    transData.forEach(function(t) {
+      var rId = t.roster_ids && t.roster_ids[0];
+      var rr = rostData.find(function(r){ return r.roster_id === rId; });
+      var tn = rr ? resolveTeamName(rr, getUser(rr.owner_id)) : null;
+      if (!tn) return;
+
+      if (t.type === 'waiver') {
+        var bid = t.settings && t.settings.waiver_bid !== undefined ? t.settings.waiver_bid : -1;
+        var adds = t.adds ? Object.keys(t.adds) : [];
+        var drops = t.drops ? Object.keys(t.drops) : [];
+
+        // q_waivorwar: 3+ waiver claims
+        teamWaiverCounts[tn] = (teamWaiverCounts[tn] || 0) + adds.length;
+
+        // q_purge: 5+ drops
+        teamDropCounts[tn] = (teamDropCounts[tn] || 0) + drops.length;
+
+        // q_waiverwinner: add waiver with $50+ bid
+        if (bid >= 50 && adds.length) {
+          var q2 = QUESTS.find(function(q){ return q.id==='q_faabballer'; });
+          if (q2) detected.push({ manager: tn, questId: 'q_faabballer', questTitle: q2.title, faab: q2.reward, evidence: tn + ' bid $' + bid + ' on waiver', needsVerify: false });
+        }
+
+        // q_bargain: $3 or less waiver claim
+        if (bid >= 0 && bid <= 3 && adds.length) {
+          var p2 = adds[0] ? playersCache[adds[0]] : null;
+          var tm2 = teamMatchups[tn];
+          if (tm2 && tm2.won) {
+            var q3 = QUESTS.find(function(q){ return q.id==='q_bargain'; });
+            if (q3) detected.push({ manager: tn, questId: 'q_bargain', questTitle: q3.title, faab: q3.reward, evidence: tn + ' won with $' + bid + ' waiver add' + (p2 ? ' (' + p2.full_name + ')' : ''), needsVerify: false });
+          }
+        }
+
+        // q_faabghost: $0 waiver add scores 15+
+        if (bid === 0 && adds.length) {
+          adds.forEach(function(pid) {
+            var tm3 = teamMatchups[tn];
+            var pts = tm3 && tm3.playerScores ? (tm3.playerScores[pid] || 0) : 0;
+            if (pts >= 15) {
+              var p3 = playersCache[pid];
+              var q4 = QUESTS.find(function(q){ return q.id==='q_faabghost'; });
+              if (q4) detected.push({ manager: tn, questId: 'q_faabghost', questTitle: q4.title, faab: q4.reward, evidence: (p3 ? p3.full_name : pid) + ' added for $0 scored ' + pts.toFixed(2), needsVerify: false });
+            }
+          });
+        }
+
+        // q_waiverwinner: waiver add scores 25+
+        adds.forEach(function(pid) {
+          var tm4 = teamMatchups[tn];
+          var pts = tm4 && tm4.playerScores ? (tm4.playerScores[pid] || 0) : 0;
+          if (pts >= 25) {
+            var p4 = playersCache[pid];
+            var q5 = QUESTS.find(function(q){ return q.id==='q_waiverwinner'; });
+            if (q5) detected.push({ manager: tn, questId: 'q_waiverwinner', questTitle: q5.title, faab: q5.reward, evidence: (p4 ? p4.full_name : pid) + ' added off waivers scored ' + pts.toFixed(2), needsVerify: false });
+          }
+        });
+
+      } else if (t.type === 'trade') {
+        var traders = (t.roster_ids||[]).map(function(rid){ var rr = rostData.find(function(r){ return r.roster_id === rid; }); return rr ? resolveTeamName(rr, getUser(rr.owner_id)) : null; }).filter(Boolean);
+        traders.forEach(function(trader) {
+          teamTradeCount[trader] = (teamTradeCount[trader] || 0) + 1;
+        });
+        // q_pickdeal: trade includes a draft pick
+        var picks = t.draft_picks || [];
+        if (picks.length > 0) {
+          traders.forEach(function(trader) {
+            var qp = QUESTS.find(function(q){ return q.id==='q_pickdeal'; });
+            if (qp) detected.push({ manager: trader, questId: 'q_pickdeal', questTitle: qp.title, faab: qp.reward, evidence: trader + ' traded ' + picks.length + ' pick(s)', needsVerify: false });
+            // q_firstflip: trade includes a 1st round pick
+            var r1picks = picks.filter(function(p){ return p.round === 1; });
+            if (r1picks.length > 0) {
+              var qf = QUESTS.find(function(q){ return q.id==='q_firstflip'; });
+              if (qf) detected.push({ manager: trader, questId: 'q_firstflip', questTitle: qf.title, faab: qf.reward, evidence: trader + ' traded a 1st round pick', needsVerify: false });
+            }
+            // q_stockpile: 3+ picks in one trade
+            if (picks.length >= 3) {
+              var qs = QUESTS.find(function(q){ return q.id==='q_stockpile'; });
+              if (qs) detected.push({ manager: trader, questId: 'q_stockpile', questTitle: qs.title, faab: qs.reward, evidence: trader + ' acquired ' + picks.length + ' picks in one trade', needsVerify: false });
+            }
+          });
+          // q_threeway: 3-manager trade
+          if (traders.length >= 3) {
+            traders.forEach(function(trader) {
+              var qt = QUESTS.find(function(q){ return q.id==='q_threeway'; });
+              if (qt) detected.push({ manager: trader, questId: 'q_threeway', questTitle: qt.title, faab: qt.reward, evidence: '3-way trade between ' + traders.join(', '), needsVerify: false });
+            });
+          }
+        }
+      }
+    });
+
+    // q_waivorwar: 3+ waiver claims in a week
+    Object.keys(teamWaiverCounts).forEach(function(tn) {
+      if (teamWaiverCounts[tn] >= 3) {
+        var q = QUESTS.find(function(q){ return q.id==='q_waivorwar'; });
+        if (q) detected.push({ manager: tn, questId: 'q_waivorwar', questTitle: q.title, faab: q.reward, evidence: tn + ' made ' + teamWaiverCounts[tn] + ' waiver claims this week', needsVerify: false });
+      }
+    });
+    // q_purge: 5+ drops
+    Object.keys(teamDropCounts).forEach(function(tn) {
+      if (teamDropCounts[tn] >= 5) {
+        var q = QUESTS.find(function(q){ return q.id==='q_purge'; });
+        if (q) detected.push({ manager: tn, questId: 'q_purge', questTitle: q.title, faab: q.reward, evidence: tn + ' dropped ' + teamDropCounts[tn] + ' players this week', needsVerify: false });
+      }
+    });
+    // q_activetrader: 5+ trades in a season (use season total from completions)
+    Object.keys(teamTradeCount).forEach(function(tn) {
+      var mc = getQuestCompletions()[tn] || [];
+      var prevTrades = mc.filter(function(c){ return c.questId === 'q_pickdeal'; }).length;
+      if (prevTrades + teamTradeCount[tn] >= 5) {
+        var q = QUESTS.find(function(q){ return q.id==='q_activetrader'; });
+        if (q) detected.push({ manager: tn, questId: 'q_activetrader', questTitle: q.title, faab: q.reward, evidence: tn + ' completed their 5th+ trade of the season', needsVerify: false });
+      }
+    });
+  }
+
+  // Season-long roster quests (taxi squad)
+  rostData.forEach(function(r) {
+    var tn = resolveTeamName(r, getUser(r.owner_id));
+    var taxiCount = (r.taxi || []).length;
+    if (taxiCount >= 5) {
+      var q = QUESTS.find(function(q){ return q.id==='q_coldstor'; });
+      if (q) detected.push({ manager: tn, questId: 'q_coldstor', questTitle: q.title, faab: q.reward, evidence: tn + ' has ' + taxiCount + ' players on taxi squad', needsVerify: false });
+    } else if (taxiCount >= 3) {
+      var q2 = QUESTS.find(function(q){ return q.id==='q_farmsys'; });
+      if (q2) detected.push({ manager: tn, questId: 'q_farmsys', questTitle: q2.title, faab: q2.reward, evidence: tn + ' has ' + taxiCount + ' players on taxi squad', needsVerify: false });
+    }
+    // q_drafthoard: 3+ 1st round picks
+    var picks = HARDCODED_PICKS[tn] || {};
+    var r1count = 0;
+    ['2026','2027','2028'].forEach(function(s){ r1count += ((picks[s] && picks[s][1]) || []).length; });
+    if (r1count >= 3) {
+      var q3 = QUESTS.find(function(q){ return q.id==='q_drafthoard'; });
+      if (q3) detected.push({ manager: tn, questId: 'q_drafthoard', questTitle: q3.title, faab: q3.reward, evidence: tn + ' owns ' + r1count + ' first round picks', needsVerify: false });
+    }
+  });
+
+  // Deduplicate: remove already-completed quests for ONE-TIME quests
+  var completions = getQuestCompletions();
+  detected = detected.filter(function(d) {
+    var q = QUESTS.find(function(q){ return q.id === d.questId; });
+    if (!q) return false;
+    if (!q.repeat) {
+      // ONE-TIME: skip if already awarded
+      var mc = completions[d.manager] || [];
+      if (mc.find(function(c){ return c.questId === d.questId; })) return false;
+    }
+    return true;
+  });
+
+  // Deduplicate same quest same team in this run
+  var seen = {};
+  detected = detected.filter(function(d) {
+    var key = d.manager + '_' + d.questId;
+    if (seen[key]) return false;
+    seen[key] = true;
+    return true;
+  });
+
+  return detected;
+}
+
+// ── QUEST PROGRESS BAR UPDATER ────────────────────────────────────────────────
+function updateQuestProgressBars(teamMatchups, transData, rostData, weekNum, playersCache) {
+  var me = getCurrentManager();
+  if (!me) return;
+  var tn = me.name;
+  var tm = teamMatchups[tn];
+  if (!tm) return;
+
+  var completions = getQuestCompletions();
+  var mc = completions[tn] || [];
+
+  // Update prog fields on QUESTS array for the signed-in manager
+  QUESTS.forEach(function(q) {
+    var completed = mc.filter(function(c){ return c.questId === q.id; }).length;
+
+    if (q.id === 'q_streak') {
+      // Volcanic Streak: count current win streak
+      var ros = rostData.find(function(r){ return resolveTeamName(r, getUser(r.owner_id)) === tn; });
+      q.prog = ros ? Math.min(ros.settings && ros.settings.streak || 0, q.goal) : 0;
+    } else if (q.id === 'q_divchamp') {
+      // Division Champion: count div wins
+      var divWins = mc.filter(function(c){ return c.questId === 'q_divblood'; }).length;
+      q.prog = Math.min(divWins, q.goal);
+    } else if (q.id === 'q_faststart') {
+      var ros2 = rostData.find(function(r){ return resolveTeamName(r, getUser(r.owner_id)) === tn; });
+      q.prog = ros2 ? Math.min(ros2.settings && ros2.settings.wins || 0, q.goal) : 0;
+    } else if (q.id === 'q_activetrader') {
+      q.prog = Math.min(mc.filter(function(c){ return c.questId === 'q_pickdeal'; }).length, q.goal);
+    } else if (q.id === 'q_waivorwar') {
+      var wc = 0;
+      if (transData) transData.forEach(function(t){ if (t.type==='waiver'){ var rid=t.roster_ids&&t.roster_ids[0]; var rr=rostData.find(function(r){return r.roster_id===rid;}); if (rr&&resolveTeamName(rr,getUser(rr.owner_id))===tn) wc++; } });
+      q.prog = Math.min(wc, q.goal);
+    } else if (q.id === 'q_coldstor' || q.id === 'q_farmsys') {
+      var ros3 = rostData.find(function(r){ return resolveTeamName(r, getUser(r.owner_id)) === tn; });
+      q.prog = ros3 ? Math.min((ros3.taxi||[]).length, q.goal) : 0;
+    } else if (q.id === 'q_drafthoard') {
+      var picks = HARDCODED_PICKS[tn] || {};
+      var r1c = 0;
+      ['2026','2027','2028'].forEach(function(s){ r1c += ((picks[s]&&picks[s][1])||[]).length; });
+      q.prog = Math.min(r1c, q.goal);
+    } else if (q.goal === 1) {
+      // Binary quests — prog = 1 if completed this week, else 0
+      q.prog = (tm && completed > 0 && mc.find(function(c){ return c.questId===q.id && c.week===weekNum; })) ? 1 : 0;
+    }
+  });
+}
+  var btn = document.getElementById('auditBtn');
+  var status = document.getElementById('auditStatus');
+  var results = document.getElementById('auditResults');
+
+  if (btn) { btn.disabled = true; btn.textContent = '🤖 Auditing...'; }
+  if (status) { status.textContent = 'Pulling Sleeper data for Week ' + weekNum + '...'; status.style.color = 'var(--gold)'; }
+  if (results) results.innerHTML = '';
+
+  try {
     // Pull all data needed from Sleeper
     var matchupData   = await safeFetch('/league/' + LID + '/matchups/' + weekNum);
     var transData     = await safeFetch('/league/' + LID + '/transactions/' + weekNum);
@@ -6371,6 +6839,9 @@ function renderProfiles() {
 }
 
 // ── SUPABASE INIT ──────────────────────────────────────────────
+// Safety: ensure SB_URL/SB_KEY are defined even if main script order shifts
+if (typeof SB_URL === 'undefined') var SB_URL = 'https://mlpwcwqmxungvbsfkfjb.supabase.co';
+if (typeof SB_KEY === 'undefined') var SB_KEY = 'sb_publishable_UnOF4zXjn_V324h_Vc7usQ_GDoFujpM';
 (function() {
   try {
     if (typeof supabase !== 'undefined' && supabase.createClient) {
@@ -6414,19 +6885,21 @@ var COT_OS_APP_ID = 'd5073e4c-59a8-424b-a7f6-7cfde9cfa96a';
 var COT_OS_REST   = 'https://onesignal.com/api/v1/notifications';
 
 window.OneSignalDeferred = window.OneSignalDeferred || [];
-OneSignalDeferred.push(async function(OneSignal) {
-  await OneSignal.init({
+OneSignalDeferred.push(function(OneSignal) {
+  OneSignal.init({
     appId: COT_OS_APP_ID,
     safari_web_id: '',
     notifyButton: { enable: false },
     allowLocalhostAsSecureOrigin: true
-  });
-  // Tag the signed-in manager so we can target them individually
-  var me = getCurrentManager && getCurrentManager();
-  if (me && me.name) {
-    OneSignal.User.addTag('manager', me.name.toLowerCase().replace(/[^a-z0-9]/g,''));
-    OneSignal.User.addTag('division', TEAM_DIVISIONS[me.name] || 'unknown');
-  }
+  }).then(function() {
+    var me = typeof getCurrentManager === 'function' ? getCurrentManager() : null;
+    if (me && me.name) {
+      try {
+        OneSignal.User.addTag('manager', me.name.toLowerCase().replace(/[^a-z0-9]/g,''));
+        OneSignal.User.addTag('division', (window.TEAM_DIVISIONS && window.TEAM_DIVISIONS[me.name]) || 'unknown');
+      } catch(e) {}
+    }
+  }).catch(function(e){ console.warn('OneSignal init error:', e); });
 });
 
 // ── ONESIGNAL SEND HELPERS ────────────────────────────────────────────────────
