@@ -252,6 +252,7 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
   body{padding-top:env(safe-area-inset-top)}
 }
 </style>
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 </head>
 <body>
 
@@ -267,7 +268,10 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
     </div>
   </div>
   <div class="hero-meta" id="hmeta">Loading...</div>
-  <div id="signinWrap" style="margin-top:6px"><button onclick="openSignIn()" id="signinBtn" style="font-family:Cinzel,serif;font-size:9px;font-weight:700;letter-spacing:1px;padding:5px 12px;border-radius:20px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer">&#128100; Sign In</button></div>
+  <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+    <div id="signinWrap"><button onclick="openSignIn()" id="signinBtn" style="font-family:Cinzel,serif;font-size:9px;font-weight:700;letter-spacing:1px;padding:5px 12px;border-radius:20px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer">&#128100; Sign In</button></div>
+    <button onclick="openNotifPanel()" id="notifBell" style="position:relative;font-size:16px;background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:50%;transition:background .2s" title="Notifications">&#128276;<span id="notifBadge" style="display:none;position:absolute;top:0;right:0;width:10px;height:10px;border-radius:50%;background:#FF6B6B;border:1.5px solid var(--navy)"></span></button>
+  </div>
 </div>
 
 <nav class="nav">
@@ -4590,7 +4594,16 @@ var DIV_CRESTS = {north:'crest-north.png',east:'crest-east.png',west:'crest-west
 var DIV_COLORS_SI = {north:'#7BB8E8',east:'#6EDE7E',west:'#FF6B6B',south:'#FFD580'};
 
 function getCurrentManager(){try{return JSON.parse(localStorage.getItem('cotManager')||'null');}catch(e){return null;}}
-function saveManager(m){localStorage.setItem('cotManager',JSON.stringify(m));}
+function saveManager(m){
+  localStorage.setItem('cotManager',JSON.stringify(m));
+  // Tag this device in OneSignal so we can send targeted push notifications
+  if (window.OneSignal && m && m.name) {
+    try {
+      OneSignal.User.addTag('manager', m.name.toLowerCase().replace(/[^a-z0-9]/g,''));
+      OneSignal.User.addTag('division', TEAM_DIVISIONS[m.name] || 'unknown');
+    } catch(e) {}
+  }
+}
 
 function openSignIn() {
   document.getElementById('signinOverlay').style.display = 'flex';
@@ -5499,6 +5512,7 @@ function confirmWarriorPayout(weekNum) {
   if (!confirm(msg)) return;
   localStorage.setItem('warriorPaid_wk' + weekNum, 'true');
   markStepDone(weekNum, 4);
+  notifyWarriorOfWeek(weekTitan.name, weekTitan.pts, weekNum);
   renderCoCommish();
 }
 
@@ -5522,6 +5536,18 @@ function confirmPayoutStep(weekNum, total) {
     + '\n\nTotal: $' + total + ' FAAB'
     + '\n\nHave you paid out all managers on Sleeper?';
   if (!confirm(msg)) return;
+  // Fire per-manager FAAB notifications
+  MANAGERS.forEach(function(m) {
+    var questFaab2 = 0, wheelFaab2 = 0, wFaab2 = 0;
+    var mc2 = completions[m.name] || [];
+    mc2.filter(function(c){ return c.week === weekNum; }).forEach(function(c){ questFaab2 += c.faab; });
+    wheelHistory.filter(function(h){ return h.manager===m.name&&h.week===weekNum&&h.val>0; }).forEach(function(h){ wheelFaab2 += h.val; });
+    if (weekTitan && weekTitan.name === m.name) wFaab2 = 20;
+    var tot = questFaab2 + wheelFaab2 + wFaab2;
+    if (tot > 0) notifyFAABEarned(m.name, tot);
+    // Quest-specific notifications
+    mc2.filter(function(c){ return c.week === weekNum; }).forEach(function(c){ notifyQuestComplete(m.name, c.questTitle, c.faab); });
+  });
   markStepDone(weekNum, 3);
   renderCoCommish();
   alert('FAAB payout confirmed for Week ' + weekNum + '. Now pay the Warrior of the Week $20 prize on Sleeper.');
@@ -6341,6 +6367,222 @@ function renderProfiles() {
 })();
 </script>
 <script>
+// ── ONESIGNAL INIT ────────────────────────────────────────────────────────────
+var COT_OS_APP_ID = 'd5073e4c-59a8-424b-a7f6-7cfde9cfa96a';
+var COT_OS_REST   = 'https://onesignal.com/api/v1/notifications';
+
+window.OneSignalDeferred = window.OneSignalDeferred || [];
+OneSignalDeferred.push(async function(OneSignal) {
+  await OneSignal.init({
+    appId: COT_OS_APP_ID,
+    safari_web_id: '',
+    notifyButton: { enable: false },
+    allowLocalhostAsSecureOrigin: true
+  });
+  // Tag the signed-in manager so we can target them individually
+  var me = getCurrentManager && getCurrentManager();
+  if (me && me.name) {
+    OneSignal.User.addTag('manager', me.name.toLowerCase().replace(/[^a-z0-9]/g,''));
+    OneSignal.User.addTag('division', TEAM_DIVISIONS[me.name] || 'unknown');
+  }
+});
+
+// ── ONESIGNAL SEND HELPERS ────────────────────────────────────────────────────
+// Sends to ALL subscribers (broadcast — used for warrior, recap)
+function osSendBroadcast(title, message, url) {
+  if (typeof fetch === 'undefined') return;
+  fetch(COT_OS_REST, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      app_id: COT_OS_APP_ID,
+      included_segments: ['Total Subscriptions'],
+      headings:  { en: title },
+      contents:  { en: message },
+      url: url || 'https://lenny22bolt.github.io/Clash-of-Titans-/',
+      chrome_web_icon: 'https://lenny22bolt.github.io/Clash-of-Titans-/icon-192.png',
+      chrome_web_badge: 'https://lenny22bolt.github.io/Clash-of-Titans-/icon-192.png'
+    })
+  }).catch(function(e){ console.warn('OneSignal send failed:', e); });
+}
+
+// Sends to a specific manager by tag (used for FAAB, quest)
+function osSendToManager(managerName, title, message, url) {
+  if (typeof fetch === 'undefined') return;
+  var tag = managerName.toLowerCase().replace(/[^a-z0-9]/g,'');
+  fetch(COT_OS_REST, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      app_id: COT_OS_APP_ID,
+      filters: [{ field:'tag', key:'manager', relation:'=', value: tag }],
+      headings: { en: title },
+      contents: { en: message },
+      url: url || 'https://lenny22bolt.github.io/Clash-of-Titans-/',
+      chrome_web_icon: 'https://lenny22bolt.github.io/Clash-of-Titans-/icon-192.png',
+      chrome_web_badge: 'https://lenny22bolt.github.io/Clash-of-Titans-/icon-192.png'
+    })
+  }).catch(function(e){ console.warn('OneSignal send failed:', e); });
+}
+
+// ── 5 EVENT TRIGGERS ─────────────────────────────────────────────────────────
+
+// 1. FAAB Earned — targeted to specific manager
+function notifyFAABEarned(managerName, amount) {
+  addNotif('faab', 'FAAB Earned!', managerName + ' received $' + amount + ' FAAB', managerName);
+  osSendToManager(managerName,
+    '&#128176; FAAB Earned — Clash of Titans',
+    managerName + ' has been paid $' + amount + ' FAAB this week!',
+    'https://lenny22bolt.github.io/Clash-of-Titans-/#rankings'
+  );
+}
+
+// 2. Quest Complete — targeted to specific manager
+function notifyQuestComplete(managerName, questTitle, faab) {
+  addNotif('quest', 'Quest Complete!', questTitle + ' · +$' + faab + ' FAAB', managerName);
+  osSendToManager(managerName,
+    '&#128220; Quest Complete — Clash of Titans',
+    managerName + ' completed "' + questTitle + '" and earned $' + faab + ' FAAB!',
+    'https://lenny22bolt.github.io/Clash-of-Titans-/#quests'
+  );
+}
+
+// 3. Warrior of the Week — broadcast to all
+function notifyWarriorOfWeek(managerName, pts, week) {
+  addNotif('warrior', 'Warrior of the Week!', managerName + ' · ' + pts + ' pts · Week ' + week + ' · +$20 FAAB');
+  osSendBroadcast(
+    '&#128081; Warrior of Week ' + week + ' — Clash of Titans',
+    managerName + ' is crowned Warrior of Week ' + week + ' with ' + pts + ' pts! They earn $20 FAAB.',
+    'https://lenny22bolt.github.io/Clash-of-Titans-/#treasury'
+  );
+}
+
+// 4. Weekly Recap Posted — broadcast to all
+function notifyRecapPosted(week) {
+  addNotif('recap', 'Week ' + week + ' Recap Posted!', 'The chronicle of Week ' + week + ' has been written. Read now.');
+  osSendBroadcast(
+    '&#128214; Week ' + week + ' Chronicle — Clash of Titans',
+    'The Week ' + week + ' Recap has been written. See who rose and fell in the realm!',
+    'https://lenny22bolt.github.io/Clash-of-Titans-/#recap'
+  );
+}
+
+// ── NOTIFICATION ENGINE ───────────────────────────────────────────────────────
+var NOTIF_KEY = 'cotNotifications_v1';
+var NOTIF_EVENTS = {
+  faab:    { icon:'&#128176;', color:'#6EDE7E',  label:'FAAB Earned'          },
+  quest:   { icon:'&#128220;', color:'#C9A84C',  label:'Quest Complete'       },
+  warrior: { icon:'&#128081;', color:'#FFD580',  label:'Warrior of the Week'  },
+  recap:   { icon:'&#128214;', color:'#7BB8E8',  label:'Weekly Recap Posted'  }
+};
+
+function getNotifs() { try { return JSON.parse(localStorage.getItem(NOTIF_KEY)||'[]'); } catch(e){ return []; } }
+function saveNotifs(n) { localStorage.setItem(NOTIF_KEY, JSON.stringify(n.slice(-50))); }
+
+function addNotif(type, title, body, teamName) {
+  var notifs = getNotifs();
+  var n = { id: Date.now(), type:type, title:title, body:body, team:teamName||'', ts: Date.now(), read:false };
+  notifs.unshift(n);
+  saveNotifs(notifs);
+  updateBell();
+  showToast(type, title, body);
+}
+
+function updateBell() {
+  var badge = document.getElementById('notifBadge');
+  if (!badge) return;
+  var unread = getNotifs().filter(function(n){ return !n.read; }).length;
+  badge.style.display = unread > 0 ? 'block' : 'none';
+}
+
+function openNotifPanel() {
+  var overlay = document.getElementById('notifOverlay');
+  var list    = document.getElementById('notifList');
+  if (!overlay || !list) return;
+  // Mark all read
+  var notifs = getNotifs();
+  notifs.forEach(function(n){ n.read = true; });
+  saveNotifs(notifs);
+  updateBell();
+  // Render list
+  if (!notifs.length) {
+    list.innerHTML = '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);text-align:center;padding:24px">No notifications yet</div>';
+  } else {
+    list.innerHTML = notifs.map(function(n) {
+      var ev = NOTIF_EVENTS[n.type] || { icon:'&#128276;', color:'var(--gold)', label:n.type };
+      var ago = timeAgo(n.ts);
+      return '<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.05)">'
+        + '<div style="font-size:18px;flex-shrink:0;margin-top:1px">'+ev.icon+'</div>'
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="font-family:Cinzel,serif;font-size:10px;font-weight:700;color:'+ev.color+'">'+n.title+'</div>'
+        + '<div style="font-family:Cinzel,serif;font-size:9px;color:rgba(255,255,255,0.7);margin-top:1px">'+n.body+'</div>'
+        + '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim);margin-top:3px">'+ago+'</div>'
+        + '</div></div>';
+    }).join('');
+  }
+  overlay.style.display = 'block';
+}
+
+function closeNotifPanel() {
+  var overlay = document.getElementById('notifOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+function clearAllNotifs() {
+  saveNotifs([]);
+  updateBell();
+  var list = document.getElementById('notifList');
+  if (list) list.innerHTML = '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);text-align:center;padding:24px">No notifications yet</div>';
+}
+
+function timeAgo(ts) {
+  var diff = Date.now() - ts;
+  var m = Math.floor(diff/60000);
+  var h = Math.floor(diff/3600000);
+  var d = Math.floor(diff/86400000);
+  if (m < 1) return 'Just now';
+  if (m < 60) return m + 'm ago';
+  if (h < 24) return h + 'h ago';
+  return d + 'd ago';
+}
+
+function showToast(type, title, body) {
+  var container = document.getElementById('toastContainer');
+  if (!container) return;
+  var ev = NOTIF_EVENTS[type] || { icon:'&#128276;', color:'var(--gold)' };
+  var toast = document.createElement('div');
+  toast.style.cssText = 'pointer-events:all;background:linear-gradient(135deg,rgba(10,22,40,0.98),rgba(19,32,64,0.98));border:1.5px solid '+ev.color+';border-radius:12px;padding:10px 14px;box-shadow:0 4px 20px rgba(0,0,0,0.7),0 0 20px '+ev.color.replace(')',',0.2)')+';display:flex;gap:10px;align-items:center;opacity:0;transform:translateX(60px);transition:all .35s ease;max-width:290px;cursor:pointer';
+  toast.innerHTML = '<div style="font-size:20px;flex-shrink:0">'+ev.icon+'</div>'
+    + '<div><div style="font-family:Cinzel,serif;font-size:10px;font-weight:700;color:'+ev.color+'">'+title+'</div>'
+    + '<div style="font-family:Cinzel,serif;font-size:9px;color:rgba(255,255,255,0.75);margin-top:1px">'+body+'</div></div>';
+  toast.onclick = function() { dismissToast(toast); openNotifPanel(); };
+  container.appendChild(toast);
+  // Animate in
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      toast.style.opacity = '1';
+      toast.style.transform = 'translateX(0)';
+    });
+  });
+  // Auto dismiss after 5s
+  var timer = setTimeout(function() { dismissToast(toast); }, 5000);
+  toast._timer = timer;
+}
+
+function dismissToast(toast) {
+  clearTimeout(toast._timer);
+  toast.style.opacity = '0';
+  toast.style.transform = 'translateX(60px)';
+  setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 350);
+}
+
+// Init on load
+window.addEventListener('DOMContentLoaded', function() {
+  updateBell();
+});
+// ── END NOTIFICATION ENGINE ───────────────────────────────────────────────────
+</script>
+<script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
     navigator.serviceWorker.register('sw.js')
@@ -6422,6 +6664,23 @@ if ('serviceWorker' in navigator) {
 <div id="payoutOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center">
   <div style="background:linear-gradient(135deg,#0A1628,#132040);border:1px solid var(--gold-border);border-radius:20px;padding:24px;max-width:480px;width:94%;max-height:85vh;overflow-y:auto;box-shadow:0 0 60px rgba(201,168,76,.2)">
     <div id="payoutInner"></div>
+  </div>
+</div>
+
+<!-- ── TOAST CONTAINER ───────────────────────────────────── -->
+<div id="toastContainer" style="position:fixed;top:16px;right:16px;z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:300px"></div>
+
+<!-- ── NOTIFICATION PANEL ────────────────────────────────── -->
+<div id="notifOverlay" style="display:none;position:fixed;inset:0;z-index:9998" onclick="if(event.target===this)closeNotifPanel()">
+  <div id="notifPanel" style="position:absolute;top:140px;right:12px;width:300px;max-height:70vh;background:linear-gradient(135deg,#0A1628,#132040);border:1px solid var(--gold-border);border-radius:16px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.8);display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--gold-border)">
+      <div style="font-family:Cinzel,serif;font-size:12px;font-weight:700;color:var(--gold)">&#128276; Notifications</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="clearAllNotifs()" style="font-family:Cinzel,serif;font-size:8px;color:var(--dim);background:none;border:none;cursor:pointer;letter-spacing:1px">CLEAR ALL</button>
+        <button onclick="closeNotifPanel()" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:16px;line-height:1">&#10005;</button>
+      </div>
+    </div>
+    <div id="notifList" style="overflow-y:auto;flex:1;padding:8px"></div>
   </div>
 </div>
 
