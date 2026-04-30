@@ -1014,11 +1014,53 @@ function viewRoster(rosterId, switchTab) {
   // ── TITAN PROFILE (top of roster) ────────────────────────────
   var _BIOS  = (typeof MANAGER_BIOS  !== 'undefined') ? MANAGER_BIOS  : {};
   var _S1S   = (typeof S1_STATS      !== 'undefined') ? S1_STATS      : {};
-  var _PICKS = (typeof PICK_COUNTS   !== 'undefined') ? PICK_COUNTS   : {};
-  var _bio   = _BIOS[tn]  || {};
-  var _s1    = _S1S[tn]   || {w:0,l:0,pts:0,result:'new',pf_rank:0};
+  // Calculate directly from HARDCODED_PICKS
+  var _PICKS = {};
+  Object.keys(HARDCODED_PICKS).forEach(function(team) {
+    var cnt = 0;
+    ['2026','2027','2028'].forEach(function(s) { [1,2,3].forEach(function(r) { cnt += ((HARDCODED_PICKS[team][s]&&HARDCODED_PICKS[team][s][r])||[]).length; }); });
+    _PICKS[team] = cnt;
+  });
+  var _bio   = _BIOS[tn] || {};
+  var _s1    = _S1S[tn]  || null;
+
+  // If exact name not found, resolve via S1_ALIASES (team name → S1 key)
+  if (!_s1 || !Object.keys(_bio).length) {
+    // Try resolving tn through S1_ALIASES to find canonical team name
+    var resolvedTeam = null;
+    // Direct alias lookup
+    if (S1_ALIASES[tn] !== undefined) {
+      resolvedTeam = tn;
+    } else {
+      // Try username → team name via USERNAME_TO_TEAM
+      var uname = (u && u.display_name) || '';
+      if (uname && USERNAME_TO_TEAM[uname]) {
+        resolvedTeam = USERNAME_TO_TEAM[uname];
+      }
+    }
+    if (resolvedTeam) {
+      if (!_s1) _s1 = _S1S[resolvedTeam] || null;
+      if (!Object.keys(_bio).length) _bio = _BIOS[resolvedTeam] || {};
+    }
+    // Last resort: strip spaces/special chars for exact comparison only
+    if (!_s1 || !Object.keys(_bio).length) {
+      var tnClean = tn.toLowerCase().replace(/[^a-z0-9]/g,'');
+      Object.keys(_S1S).forEach(function(k) {
+        if (k.toLowerCase().replace(/[^a-z0-9]/g,'') === tnClean) {
+          if (!_s1) _s1 = _S1S[k];
+          if (!Object.keys(_bio).length) _bio = _BIOS[k] || {};
+        }
+      });
+    }
+  }
+  if (!_s1) _s1 = {w:0,l:0,pts:0,result:'new',pf_rank:0};
   var _picks = _PICKS[tn] || 0;
-  var _mgr   = MANAGERS.find(function(x){ return x.name===tn; }) || {};
+  // Fuzzy match if exact name differs
+  if (!_picks) { Object.keys(_PICKS).forEach(function(k) { if (k.toLowerCase()===tn.toLowerCase() || tn.toLowerCase().indexOf(k.split(' ')[0].toLowerCase())!==-1 || k.toLowerCase().indexOf(tn.split(' ')[0].toLowerCase())!==-1) { _picks = _PICKS[k]; } }); }
+  var _mgr   = MANAGERS.find(function(x){ return x.name===tn; })
+            || MANAGERS.find(function(x){ return x.username && u && u.display_name && x.username.toLowerCase()===(u.display_name||'').toLowerCase(); })
+            || MANAGERS.find(function(x){ return x.name.replace(/[^a-z0-9]/gi,'').toLowerCase()===tn.replace(/[^a-z0-9]/gi,'').toLowerCase(); })
+            || {};
   var _titan = (typeof getTitanHistory==='function') ? getTitanHistory().filter(function(t){ return t.name===tn; }) : [];
   var _rc    = _s1.result==='champion'?'var(--gold)':_s1.result==='runner-up'?'#CCC':_s1.result==='third'?'#CD7F32':_s1.result==='basement'?'var(--red)':_s1.result==='new'?'var(--blue)':'var(--dim)';
   var _rl    = _s1.result==='champion'?'🏆 S1 Champion':_s1.result==='runner-up'?'🥈 S1 Runner-Up':_s1.result==='third'?'🥉 S1 Third':_s1.result==='basement'?'💀 S1 Basement':_s1.result==='new'?'🆕 S2 Debut':_s1.result==='playoff'?'🏅 Made Playoffs':'📊 Regular Season';
