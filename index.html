@@ -183,6 +183,7 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
 @keyframes wv-npc-pause-burst{0%{transform:scale(0);opacity:1}100%{transform:scale(2.5);opacity:0}}
 /* Biome particle keyframes — translated from Unity BiomeEnvironmentController.cs */
 @keyframes wvDustFloat{0%{transform:translate(0,0);opacity:0}10%{opacity:1}80%{opacity:0.6}100%{transform:translate(var(--pdx,8px),var(--pdy,-30px));opacity:0}}
+@keyframes slideInLeft{0%{transform:translateX(-100px);opacity:0}100%{transform:translateX(0);opacity:1}}
 @keyframes wvSandDrift{0%{transform:translateX(0);opacity:0}10%{opacity:1}90%{opacity:0.4}100%{transform:translateX(60px);opacity:0}}
 @keyframes wvSnowFall{0%{transform:translate(0,0) rotate(0deg);opacity:0}5%{opacity:0.85}90%{opacity:0.6}100%{transform:translate(var(--pdx,5px),110px) rotate(180deg);opacity:0}}
 @keyframes wvMistDrift{0%,100%{transform:translate(0,0) scale(1);opacity:var(--pop,0.08)}50%{transform:translate(15px,-10px) scale(1.1);opacity:calc(var(--pop,0.08)*1.4)}}
@@ -310,6 +311,7 @@ document.addEventListener('DOMContentLoaded', function() {
   <button class="nb"     onclick="showTab('fallen',this)">Fallen</button>
   <button class="nb"     onclick="showTab('quests',this)">🗡 Quests</button>
   <button class="nb"     onclick="showTab('power',this)">👑 Power Rankings</button>
+  <button class="nb"     onclick="showTab('sidepots',this)">💰 Side Pots</button>
   <button class="nb"     onclick="showTab('realmmap',this)">🗺 Realm Map</button>
   <button class="nb"     onclick="showTab('wheel',this)">🎰 Daily Wheel</button>
   <button class="nb"     onclick="showTab('rankings',this)">&#127942; Realm Rankings</button>
@@ -334,6 +336,7 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
   <div class="sec" id="sec-rankings"><div id="rankingswrap"></div></div>
   <div class="sec" id="sec-cocommish"><div id="cocommishwrap"></div></div>
+  <div class="sec" id="sec-sidepots"><div id="sidepotswrap"></div></div>
   <div class="sec" id="sec-quests"><div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px"><div class="stitle" style="margin:0">🗡 Quest Board</div></div><div id="questswrap"></div></div>
   <div class="sec" id="sec-realmmap">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
@@ -2454,6 +2457,159 @@ var questOrder = null;
 try { questOrder = JSON.parse(localStorage.getItem('questOrder')||'null'); } catch(e){}
 if (!questOrder) questOrder = QUESTS.map(function(q){return q.id;});
 
+// ── SIDE POTS SYSTEM ──────────────────────────────────────────────────────────
+var SIDE_POTS_KEY = 'cotSidePots_v1';
+var SIDE_POT_BETS_KEY = 'cotSidePotBets_v1';
+
+async function getSidePots() {
+  if (!sbReady()) return [];
+  try {
+    var res = await sbFetch('side_pots');
+    return res || [];
+  } catch(e) { 
+    console.warn('getSidePots error:', e);
+    return [];
+  }
+}
+
+async function saveSidePots(pots) {
+  // Not needed — Supabase auto-saves via insert/update
+}
+
+async function getSidePotBets() {
+  if (!sbReady()) return [];
+  try {
+    var res = await sbFetch('side_pot_bets');
+    return res || [];
+  } catch(e) {
+    console.warn('getSidePotBets error:', e);
+    return [];
+  }
+}
+
+async function saveSidePotBets(bets) {
+  // Not needed — Supabase auto-saves via insert/update
+}
+
+async function createSidePot(title, type, description, minStake, maxStake) {
+  if (!sbReady()) return null;
+  var me = getCurrentManager && getCurrentManager();
+  var pot = {
+    id: 'pot_' + Date.now(),
+    title: title,
+    type: type,
+    description: description,
+    creator: me ? me.name : 'Commissioner',
+    min_stake: minStake || 5,
+    max_stake: maxStake || 500,
+    balance: 0,
+    created_at: new Date().toISOString(),
+    status: 'active',
+    resolved: false,
+    winner: null,
+    payouts: {}
+  };
+  try {
+    await SB.from('side_pots').insert([pot]);
+    return pot;
+  } catch(e) {
+    console.error('createSidePot error:', e);
+    return null;
+  }
+}
+
+async function placeSidePotBet(potId, manager, stake, prediction) {
+  if (!sbReady()) return false;
+  try {
+    var pots = await getSidePots();
+    var pot = pots.find(function(p){ return p.id === potId; });
+    if (!pot || pot.status !== 'active') return false;
+    if (stake < pot.min_stake || stake > pot.max_stake) return false;
+
+    var bets = await getSidePotBets();
+    var existing = bets.find(function(b){ return b.pot_id === potId && b.manager === manager; });
+
+    var bet = {
+      id: 'bet_' + Date.now(),
+      pot_id: potId,
+      manager: manager,
+      stake: stake,
+      prediction: prediction,
+      placed_at: new Date().toISOString(),
+      result: null
+    };
+
+    if (existing) {
+      // Update existing bet
+      await SB.from('side_pot_bets').update(bet).eq('id', existing.id);
+    } else {
+      // Insert new bet
+      await SB.from('side_pot_bets').insert([bet]);
+    }
+
+    // Update pot balance
+    var newBalance = (pot.balance || 0) + stake;
+    await SB.from('side_pots').update({ balance: newBalance }).eq('id', potId);
+
+    return true;
+  } catch(e) {
+    console.error('placeSidePotBet error:', e);
+    return false;
+  }
+}
+
+async function resolveSidePot(potId, winnerPredictions) {
+  if (!sbReady()) return false;
+  try {
+    var pots = await getSidePots();
+    var bets = await getSidePotBets();
+    var pot = pots.find(function(p){ return p.id === potId; });
+    if (!pot) return false;
+
+    var potBets = bets.filter(function(b){ return b.pot_id === potId; });
+    var winners = [];
+    var payouts = {};
+
+    // Mark all bets as won/lost
+    await Promise.all(potBets.map(async function(bet) {
+      var winnerPred = winnerPredictions[bet.manager];
+      var isWinner = false;
+      if (winnerPred) {
+        isWinner = Array.isArray(winnerPred) ? winnerPred.indexOf(bet.prediction) !== -1 : winnerPred === bet.prediction;
+      }
+      if (isWinner) {
+        winners.push(bet);
+      }
+      var result = isWinner ? 'won' : 'lost';
+      await SB.from('side_pot_bets').update({ result: result }).eq('id', bet.id);
+    }));
+
+    // Calculate payouts
+    if (winners.length > 0) {
+      var totalWinnings = pot.balance;
+      var payPerWinner = totalWinnings / winners.length;
+      winners.forEach(function(bet) {
+        payouts[bet.manager] = (payouts[bet.manager] || 0) + payPerWinner;
+      });
+    }
+
+    // Update pot as resolved
+    var winnerNames = winners.length > 0 ? winners.map(function(w){ return w.manager; }) : [];
+    await SB.from('side_pots').update({
+      status: 'resolved',
+      resolved: true,
+      winner: winnerNames,
+      payouts: payouts,
+      updated_at: new Date().toISOString()
+    }).eq('id', potId);
+
+    return true;
+  } catch(e) {
+    console.error('resolveSidePot error:', e);
+    return false;
+  }
+}
+
 function getOrderedQuests() {
   var map = {};
   QUESTS.forEach(function(q){map[q.id]=q;});
@@ -4136,8 +4292,9 @@ function showTab(tab, btn) {
   if (btn) btn.classList.add('on');
   // Re-render wheel fresh each time tab is opened so spin state reflects current manager
   if (tab === 'wheel') setTimeout(renderWheel, 50);
-  if (tab === 'rankings') setTimeout(renderRankings, 50);
-  if (tab === 'livedraft') setTimeout(renderLiveDraft, 50);
+  if (tab === 'sidepots') setTimeout(renderSidePots, 50);
+  if (tab === 'publicbets') setTimeout(renderPublicBets, 50);
+  if (tab === 'publicbets') setTimeout(renderPublicBets, 50);
   if (tab === 'realmmap') {
     setTimeout(function() {
       if (realmViewMode === 'world') { renderWorldView(); }
@@ -6452,6 +6609,159 @@ function buildSleeperTransactionSummary() {
   return lines.join('\n');
 }
 
+// ── SIDE POTS RENDERER ────────────────────────────────────────────────────────
+async function renderSidePots() {
+  var wrap = document.getElementById('sidepotswrap');
+  if (!wrap) return;
+  var me = getCurrentManager && getCurrentManager();
+  var pots = await getSidePots();
+  var bets = await getSidePotBets();
+  var html = '';
+
+  html += '<div style="padding:20px;max-width:1200px;margin:0 auto">';
+  html += '<h2 style="font-family:Cinzel,serif;font-size:28px;color:var(--gold);margin-bottom:20px;letter-spacing:2px">💰 SIDE POTS</h2>';
+
+  // Create Pot button for signed-in manager
+  if (me) {
+    html += '<button onclick="openCreatePotPanel()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:14px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer;margin-bottom:24px">+ CREATE NEW POT</button>';
+  }
+
+  // Active pots
+  var activePots = pots.filter(function(p){ return p.status==='active'; });
+  if (activePots.length > 0) {
+    html += '<div style="margin-bottom:40px">';
+    html += '<h3 style="font-family:Cinzel,serif;font-size:14px;color:var(--gold);margin-bottom:16px;letter-spacing:1px">ACTIVE POTS</h3>';
+    activePots.forEach(function(pot) {
+      var potBets = bets.filter(function(b){ return b.potId===pot.id; });
+      var myBet = me ? potBets.find(function(b){ return b.manager===me.name; }) : null;
+      html += '<div style="background:linear-gradient(135deg,rgba(10,22,40,0.8),rgba(19,32,64,0.8));border:1px solid var(--gold-border);border-radius:14px;padding:16px;margin-bottom:12px">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">';
+      html += '<div>';
+      html += '<div style="font-family:Cinzel,serif;font-size:14px;font-weight:700;color:var(--gold)">'+pot.title+'</div>';
+      html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);margin-top:4px">By '+pot.creator+' · '+pot.type.toUpperCase()+'</div>';
+      html += '<div style="font-family:Cinzel,serif;font-size:10px;color:rgba(255,255,255,0.7);margin-top:6px">'+pot.description+'</div>';
+      html += '</div>';
+      html += '<div style="text-align:right">';
+      html += '<div style="font-family:Cinzel,serif;font-size:16px;color:#FFD580">💰 $'+pot.balance.toFixed(2)+'</div>';
+      html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);margin-top:2px">'+potBets.length+' bets</div>';
+      html += '</div>';
+      html += '</div>';
+      html += '<div style="border-top:1px solid rgba(201,168,76,.2);padding-top:12px;margin-top:12px">';
+      html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);margin-bottom:8px">Stake range: $'+pot.minStake+' - $'+pot.maxStake+'</div>';
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:12px">';
+      potBets.forEach(function(bet) {
+        var betColor = myBet && bet.id===myBet.id ? 'var(--gold)' : 'rgba(255,255,255,0.7)';
+        html += '<div style="background:rgba(201,168,76,.08);border:1px solid '+betColor+';border-radius:8px;padding:8px;text-align:center">';
+        html += '<div style="font-family:Cinzel,serif;font-size:8px;color:'+betColor+';font-weight:700">'+bet.manager+'</div>';
+        html += '<div style="font-family:Cinzel,serif;font-size:10px;color:'+betColor+';margin-top:2px">$'+bet.stake.toFixed(0)+'</div>';
+        html += '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim);margin-top:2px">'+bet.prediction+'</div>';
+        html += '</div>';
+      });
+      html += '</div>';
+      if (me) {
+        html += '<button onclick="openPlaceBetPanel(\''+pot.id+'\',\''+pot.title+'\',\''+pot.type+'\')" style="font-family:Cinzel,serif;font-size:9px;font-weight:700;letter-spacing:1px;padding:6px 12px;border-radius:8px;border:1px solid rgba(110,222,126,.4);background:rgba(110,222,126,.12);color:#6EDE7E;cursor:pointer;width:100%">'+( myBet ? 'UPDATE' : 'PLACE' )+' BET</button>';
+      }
+      html += '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  // Resolved pots
+  var resolvedPots = pots.filter(function(p){ return p.resolved; });
+  if (resolvedPots.length > 0) {
+    html += '<div>';
+    html += '<h3 style="font-family:Cinzel,serif;font-size:14px;color:var(--gold);margin-bottom:16px;letter-spacing:1px">RESOLVED</h3>';
+    resolvedPots.forEach(function(pot) {
+      html += '<div style="background:rgba(19,32,64,.5);border:1px solid rgba(201,168,76,.2);border-radius:14px;padding:14px;margin-bottom:10px">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center">';
+      html += '<div>';
+      html += '<div style="font-family:Cinzel,serif;font-size:12px;font-weight:700;color:var(--dim)">'+pot.title+'</div>';
+      html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);margin-top:2px">Total pot: $'+pot.balance.toFixed(2)+'</div>';
+      html += '</div>';
+      html += '<div style="text-align:right">';
+      if (pot.winner && pot.winner.length > 0) {
+        html += '<div style="font-family:Cinzel,serif;font-size:9px;color:#6EDE7E">✓ WINNER: '+pot.winner.join(', ')+'</div>';
+      } else {
+        html += '<div style="font-family:Cinzel,serif;font-size:9px;color:#FF6B6B">✗ NO WINNERS</div>';
+      }
+      html += '</div>';
+      html += '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  // ── PUBLIC LEADERBOARDS (integrated into Side Pots tab) ────
+  // Live feed — newest bets first
+  var allBets = bets.slice().reverse();
+  var recentBets = allBets.slice(0, 20);
+  
+  if (recentBets.length > 0) {
+    html += '<div style="margin-top:40px;border-top:1px solid rgba(201,168,76,.2);padding-top:24px">';
+    html += '<h3 style="font-family:Cinzel,serif;font-size:14px;color:var(--gold);margin-bottom:12px;letter-spacing:1px">⚡ LIVE BETTING FEED</h3>';
+    html += '<div style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto">';
+    
+    recentBets.forEach(function(bet, idx) {
+      var pot = pots.find(function(p){ return p.id === bet.pot_id; });
+      if (!pot) return;
+      var icon = pot.type === 'matchup' ? '⚔' : pot.type === 'score' ? '🎯' : '🎲';
+      var anim_delay = idx * 0.05;
+      
+      html += '<div style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.15);border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;animation:slideInLeft 0.6s ease-out '+anim_delay+'s both;opacity:0">';
+      html += '<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">';
+      html += '<div style="font-size:14px">'+icon+'</div>';
+      html += '<div style="min-width:0">';
+      html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--gold);font-weight:700">'+bet.manager+'</div>';
+      html += '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim);margin-top:1px">'+pot.title+'</div>';
+      html += '</div>';
+      html += '</div>';
+      html += '<div style="text-align:right;flex-shrink:0">';
+      html += '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--gold);font-weight:700">$'+bet.stake.toFixed(0)+'</div>';
+      html += '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim);margin-top:1px">'+bet.prediction.substring(0,25)+'</div>';
+      html += '</div>';
+      html += '</div>';
+    });
+    
+    html += '</div>';
+    html += '</div>';
+  }
+  
+  // Manager betting leaderboard — who's bet the most money
+  var managerTotals = {};
+  bets.forEach(function(bet) {
+    managerTotals[bet.manager] = (managerTotals[bet.manager] || 0) + bet.stake;
+  });
+  var topBettors = Object.keys(managerTotals).map(function(m){ return {manager:m, total:managerTotals[m]}; }).sort(function(a,b){ return b.total-a.total; });
+  
+  if (topBettors.length > 0) {
+    html += '<div style="margin-top:30px;border-top:1px solid rgba(201,168,76,.2);padding-top:24px">';
+    html += '<h3 style="font-family:Cinzel,serif;font-size:14px;color:var(--gold);margin-bottom:12px;letter-spacing:1px">🐳 WHALE ALERT — Total Staked</h3>';
+    html += '<div style="display:flex;flex-direction:column;gap:6px;max-width:500px">';
+    
+    topBettors.slice(0, 10).forEach(function(entry, idx) {
+      var medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '#'+(idx+1);
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.15);border-radius:10px;padding:10px 12px">';
+      html += '<div style="display:flex;align-items:center;gap:8px">';
+      html += '<div style="font-size:14px">'+medal+'</div>';
+      html += '<div style="font-family:Cinzel,serif;font-size:10px;font-weight:700;color:var(--gold)">'+entry.manager+'</div>';
+      html += '</div>';
+      html += '<div style="font-family:Cinzel,serif;font-size:11px;color:#FFD580;font-weight:700">$'+entry.total.toFixed(0)+'</div>';
+      html += '</div>';
+    });
+    
+    html += '</div>';
+    html += '</div>';
+  }
+
+  if (pots.length === 0 && bets.length === 0) {
+    html += '<div style="text-align:center;padding:60px 20px;color:var(--dim);font-family:Cinzel,serif;font-size:12px">No side pots or bets yet. Create one to get started!</div>';
+  }
+
+  html += '</div>';
+  wrap.innerHTML = html;
+}
+
 function renderRecap() {
   var wrap = document.getElementById('recapwrap');
   if (!wrap) return;
@@ -6967,6 +7277,92 @@ window.addEventListener('DOMContentLoaded', function() {
 // ── END NOTIFICATION ENGINE ───────────────────────────────────────────────────
 </script>
 <script>
+// ── SIDE POT MODAL FUNCTIONS ──────────────────────────────────
+function openCreatePotPanel() {
+  var overlay = document.getElementById('createPotOverlay');
+  if (overlay) overlay.style.display = 'flex';
+}
+
+var currentBetPotId = null;
+var currentBetType = null;
+
+function openPlaceBetPanel(potId, title, type) {
+  currentBetPotId = potId;
+  currentBetType = type;
+  var overlay = document.getElementById('placeBetOverlay');
+  var titleEl = document.getElementById('betTitle');
+  var optionsEl = document.getElementById('betTypeOptions');
+  if (titleEl) titleEl.textContent = 'PLACE BET — ' + title;
+  
+  // Show appropriate bet type options
+  var options = [];
+  if (type === 'matchup') {
+    options = ['Team A Wins', 'Team B Wins'];
+  } else if (type === 'score') {
+    options = ['Team A Higher', 'Team B Higher'];
+  } else {
+    options = ['Yes', 'No', 'Other'];
+  }
+  
+  if (optionsEl) {
+    optionsEl.innerHTML = options.map(function(opt) {
+      return '<button onclick="document.getElementById(\'betPrediction\').value=\''+opt+'\'" style="font-family:Cinzel,serif;font-size:9px;padding:8px;border-radius:8px;border:1px solid var(--gold-border);background:rgba(201,168,76,.08);color:var(--gold);cursor:pointer">'+opt+'</button>';
+    }).join('');
+  }
+  
+  if (overlay) overlay.style.display = 'flex';
+}
+
+async function submitCreatePot() {
+  var title = document.getElementById('potTitle') && document.getElementById('potTitle').value;
+  var type = document.getElementById('potType') && document.getElementById('potType').value;
+  var desc = document.getElementById('potDesc') && document.getElementById('potDesc').value;
+  var minStake = parseFloat(document.getElementById('potMinStake') && document.getElementById('potMinStake').value || 5);
+  var maxStake = parseFloat(document.getElementById('potMaxStake') && document.getElementById('potMaxStake').value || 500);
+  
+  if (!title || !type || !desc) {
+    alert('Please fill in all fields');
+    return;
+  }
+  
+  var pot = await createSidePot(title, type, desc, minStake, maxStake);
+  if (pot) {
+    alert('Pot created!');
+    document.getElementById('createPotOverlay').style.display = 'none';
+    document.getElementById('potTitle').value = '';
+    document.getElementById('potDesc').value = '';
+    document.getElementById('potMinStake').value = '5';
+    document.getElementById('potMaxStake').value = '500';
+    await renderSidePots();
+  } else {
+    alert('Failed to create pot');
+  }
+}
+
+async function submitPlaceBet() {
+  var me = getCurrentManager && getCurrentManager();
+  if (!me) { alert('Please sign in first'); return; }
+  
+  var stake = parseFloat(document.getElementById('betStake') && document.getElementById('betStake').value);
+  var prediction = document.getElementById('betPrediction') && document.getElementById('betPrediction').value;
+  
+  if (!prediction || !stake) {
+    alert('Please fill in all fields');
+    return;
+  }
+  
+  var success = await placeSidePotBet(currentBetPotId, me.name, stake, prediction);
+  if (success) {
+    alert('Bet placed!');
+    document.getElementById('placeBetOverlay').style.display = 'none';
+    document.getElementById('betPrediction').value = '';
+    document.getElementById('betStake').value = '10';
+    await renderSidePots();
+  } else {
+    alert('Could not place bet — check stake limits or try again');
+  }
+}
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
     navigator.serviceWorker.register('sw.js')
@@ -7068,6 +7464,66 @@ if ('serviceWorker' in navigator) {
   </div>
 </div>
 
+
+<!-- ── SIDE POT MODALS ──────────────────────────────────────── -->
+<div id="createPotOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:linear-gradient(135deg,#0A1628,#132040);border:1px solid var(--gold-border);border-radius:20px;padding:24px;max-width:420px;width:94%;max-height:85vh;overflow-y:auto;box-shadow:0 0 60px rgba(201,168,76,.2)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <div style="font-family:Cinzel,serif;font-size:14px;font-weight:700;color:var(--gold);letter-spacing:1px">CREATE NEW POT</div>
+      <button onclick="document.getElementById('createPotOverlay').style.display='none'" style="background:none;border:none;font-size:18px;color:var(--dim);cursor:pointer">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div>
+        <label style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:1px">POT TITLE</label>
+        <input id="potTitle" type="text" placeholder="e.g., Weekly High Score Pool" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--gold-border);background:rgba(0,0,0,.3);color:var(--text);font-family:EB Garamond,serif;font-size:11px;box-sizing:border-box;outline:none;margin-top:4px">
+      </div>
+      <div>
+        <label style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:1px">TYPE</label>
+        <select id="potType" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--gold-border);background:rgba(0,0,0,.3);color:var(--text);font-family:Cinzel,serif;font-size:10px;box-sizing:border-box;outline:none;margin-top:4px">
+          <option value="matchup">Matchup Winner</option>
+          <option value="score">High Score</option>
+          <option value="custom">Custom Bet</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:1px">DESCRIPTION</label>
+        <textarea id="potDesc" placeholder="What are people betting on?" style="width:100%;height:60px;padding:8px 12px;border-radius:8px;border:1px solid var(--gold-border);background:rgba(0,0,0,.3);color:var(--text);font-family:EB Garamond,serif;font-size:11px;box-sizing:border-box;outline:none;resize:none;margin-top:4px"></textarea>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:1px">MIN STAKE ($)</label>
+          <input id="potMinStake" type="number" value="5" min="1" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--gold-border);background:rgba(0,0,0,.3);color:var(--text);font-family:Cinzel,serif;font-size:10px;box-sizing:border-box;outline:none;margin-top:4px">
+        </div>
+        <div>
+          <label style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:1px">MAX STAKE ($)</label>
+          <input id="potMaxStake" type="number" value="500" min="1" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--gold-border);background:rgba(0,0,0,.3);color:var(--text);font-family:Cinzel,serif;font-size:10px;box-sizing:border-box;outline:none;margin-top:4px">
+        </div>
+      </div>
+      <button onclick="submitCreatePot()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 16px;border-radius:8px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer;margin-top:8px">CREATE POT</button>
+    </div>
+  </div>
+</div>
+
+<div id="placeBetOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:linear-gradient(135deg,#0A1628,#132040);border:1px solid var(--gold-border);border-radius:20px;padding:24px;max-width:420px;width:94%;max-height:85vh;overflow-y:auto;box-shadow:0 0 60px rgba(201,168,76,.2)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <div style="font-family:Cinzel,serif;font-size:14px;font-weight:700;color:var(--gold);letter-spacing:1px" id="betTitle">PLACE BET</div>
+      <button onclick="document.getElementById('placeBetOverlay').style.display='none'" style="background:none;border:none;font-size:18px;color:var(--dim);cursor:pointer">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div id="betTypeOptions" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px"></div>
+      <div>
+        <label style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:1px">YOUR PREDICTION</label>
+        <input id="betPrediction" type="text" placeholder="e.g., Team A wins, 45+ points" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--gold-border);background:rgba(0,0,0,.3);color:var(--text);font-family:EB Garamond,serif;font-size:11px;box-sizing:border-box;outline:none;margin-top:4px">
+      </div>
+      <div>
+        <label style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:1px">STAKE ($)</label>
+        <input id="betStake" type="number" value="10" min="1" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--gold-border);background:rgba(0,0,0,.3);color:var(--text);font-family:Cinzel,serif;font-size:10px;box-sizing:border-box;outline:none;margin-top:4px">
+      </div>
+      <button onclick="submitPlaceBet()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 16px;border-radius:8px;border:1px solid rgba(110,222,126,.4);background:rgba(110,222,126,.12);color:#6EDE7E;cursor:pointer;margin-top:8px">PLACE BET</button>
+    </div>
+  </div>
+</div>
 
 <!-- ── COMMISSIONER PIN MODAL ────────────────────────────── -->
 <div id="pinOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:99999;align-items:center;justify-content:center">
