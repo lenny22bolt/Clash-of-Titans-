@@ -253,6 +253,29 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
 }
 </style>
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+window.OneSignalDeferred = window.OneSignalDeferred || [];
+// Wrap in DOMContentLoaded to ensure page is ready
+document.addEventListener('DOMContentLoaded', function() {
+  try {
+    OneSignalDeferred.push(function(OneSignal) {
+      OneSignal.init({
+        appId: 'd5073e4c-59a8-424b-a7f6-7cfde9cfa96a',
+        notifyButton: { enable: false },
+        allowLocalhostAsSecureOrigin: true
+      }).then(function() {
+        try {
+          var me = typeof getCurrentManager === 'function' ? getCurrentManager() : null;
+          if (me && me.name) {
+            OneSignal.User.addTag('manager', me.name.toLowerCase().replace(/[^a-z0-9]/g,''));
+            OneSignal.User.addTag('division', (window.TEAM_DIVISIONS && window.TEAM_DIVISIONS[me.name]) || 'unknown');
+          }
+        } catch(tagErr) { console.warn('OneSignal tag error:', tagErr); }
+      }).catch(function(e) { console.warn('OneSignal init error:', e); });
+    });
+  } catch(e) { console.warn('OneSignal setup error:', e); }
+});
+</script>
 </head>
 <body>
 
@@ -4400,7 +4423,7 @@ function buildWheelLeaderboard(history) {
   return html + '</div>';
 }
 
-function spinWheel() {
+async function spinWheel() {
   if (!canSpinToday()) return;
   var btn = document.getElementById('spinBtn');
   if(btn){ btn.disabled=true; btn.textContent='Spinning...'; }
@@ -5367,144 +5390,6 @@ function updateQuestProgressBars(teamMatchups, transData, rostData, weekNum, pla
     }
   });
 }
-  var btn = document.getElementById('auditBtn');
-  var status = document.getElementById('auditStatus');
-  var results = document.getElementById('auditResults');
-
-  if (btn) { btn.disabled = true; btn.textContent = '🤖 Auditing...'; }
-  if (status) { status.textContent = 'Pulling Sleeper data for Week ' + weekNum + '...'; status.style.color = 'var(--gold)'; }
-  if (results) results.innerHTML = '';
-
-  try {
-    // Pull all data needed from Sleeper
-    var matchupData   = await safeFetch('/league/' + LID + '/matchups/' + weekNum);
-    var transData     = await safeFetch('/league/' + LID + '/transactions/' + weekNum);
-    var rostData      = S.rosters || [];
-    var playersCache  = JSON.parse(localStorage.getItem('nflPlayers') || '{}');
-
-    if (!matchupData) throw new Error('Could not fetch matchup data from Sleeper');
-
-    // Build matchup pairs
-    var games = {};
-    matchupData.forEach(function(m) {
-      if (!games[m.matchup_id]) games[m.matchup_id] = [];
-      games[m.matchup_id].push(m);
-    });
-
-    // Build team name -> matchup data map
-    var teamMatchups = {};
-    Object.values(games).forEach(function(pair) {
-      if (pair.length !== 2) return;
-      var a = pair[0], b = pair[1];
-      var rA = rostData.find(function(r){ return r.roster_id === a.roster_id; });
-      var rB = rostData.find(function(r){ return r.roster_id === b.roster_id; });
-      if (!rA || !rB) return;
-      var nA = resolveTeamName(rA, getUser(rA.owner_id));
-      var nB = resolveTeamName(rB, getUser(rB.owner_id));
-      var pA = a.points || 0, pB = b.points || 0;
-
-      // Starters + bench scores
-      var startersA = a.starters || [], startersB = b.starters || [];
-      var playerScoresA = a.players_points || {}, playerScoresB = b.players_points || {};
-
-      teamMatchups[nA] = { team: nA, opp: nB, pts: pA, oppPts: pB, won: pA > pB, margin: Math.abs(pA-pB), starters: startersA, playerScores: playerScoresA, benchPlayers: (a.players||[]).filter(function(p){ return startersA.indexOf(p) === -1; }), roster: rA };
-      teamMatchups[nB] = { team: nB, opp: nA, pts: pB, oppPts: pA, won: pB > pA, margin: Math.abs(pA-pB), starters: startersB, playerScores: playerScoresB, benchPlayers: (b.players||[]).filter(function(p){ return startersB.indexOf(p) === -1; }), roster: rB };
-    });
-
-    // Build transaction summary
-    var transSummary = '';
-    if (transData && transData.length) {
-      transData.slice(0, 30).forEach(function(t) {
-        if (t.type === 'waiver') {
-          var adds = (t.adds ? Object.keys(t.adds) : []).map(function(pid){ var p = playersCache[pid]; return p ? p.full_name : pid; });
-          var drops = (t.drops ? Object.keys(t.drops) : []).map(function(pid){ var p = playersCache[pid]; return p ? p.full_name : pid; });
-          var rId = t.roster_ids && t.roster_ids[0];
-          var rr = rostData.find(function(r){ return r.roster_id === rId; });
-          var tn = rr ? resolveTeamName(rr, getUser(rr.owner_id)) : 'Unknown';
-          var bid = t.settings && t.settings.waiver_bid !== undefined ? '$' + t.settings.waiver_bid : '';
-          transSummary += tn + ' added ' + adds.join(', ') + (drops.length ? ' dropped ' + drops.join(', ') : '') + (bid ? ' bid:' + bid : '') + '\n';
-        } else if (t.type === 'trade') {
-          var traders = (t.roster_ids||[]).map(function(rid){ var rr = rostData.find(function(r){ return r.roster_id === rid; }); return rr ? resolveTeamName(rr, getUser(rr.owner_id)) : 'Unknown'; });
-          transSummary += 'TRADE: ' + traders.join(' + ') + '\n';
-        }
-      });
-    }
-
-    // Build standings context
-    var standingsCtx = '';
-    rostData.forEach(function(r) {
-      var tn = resolveTeamName(r, getUser(r.owner_id));
-      var w = r.settings && r.settings.wins || 0;
-      var l = r.settings && r.settings.losses || 0;
-      var pf = r.settings && r.settings.fpts || 0;
-      standingsCtx += tn + ': ' + w + '-' + l + ' PF:' + pf + '\n';
-    });
-
-    if (status) status.textContent = '🤖 Claude is analyzing all 86 quests...';
-
-    // Build the quest list for Claude
-    var questList = QUESTS.filter(function(q){ return q.status !== 'locked'; }).map(function(q){
-      return q.id + ' | ' + q.title + ' | $' + q.reward + ' | ' + (q.repeat ? 'REPEAT' : 'ONE-TIME') + ' | ' + q.desc;
-    }).join('\n');
-
-    // Build matchup summary for Claude
-    var matchupSummary = Object.values(teamMatchups).map(function(m) {
-      var starterScores = m.starters.map(function(pid) {
-        var p = playersCache[pid]; var pts = m.playerScores[pid] || 0;
-        return (p ? p.full_name + '(' + (p.position||'?') + ')' : pid) + ':' + pts;
-      }).join(', ');
-      var benchScores = m.benchPlayers.slice(0,5).map(function(pid) {
-        var p = playersCache[pid]; var pts = m.playerScores[pid] || 0;
-        return (p ? p.full_name + '(' + (p.position||'?') + ')' : pid) + ':' + pts;
-      }).join(', ');
-      return m.team + ' vs ' + m.opp + ' | Score:' + m.pts.toFixed(1) + ' OppScore:' + m.oppPts.toFixed(1) + ' | ' + (m.won?'WON':'LOST') + ' by ' + m.margin.toFixed(2) + '\nStarters: ' + starterScores + '\nBench: ' + benchScores;
-    }).join('\n\n');
-
-    // Claude prompt
-    var prompt = 'You are the Co-Commissioner AI for Clash of Titans dynasty fantasy football league.\n\n'
-      + 'WEEK ' + weekNum + ' DATA:\n\n'
-      + '=== MATCHUPS & SCORES ===\n' + matchupSummary + '\n\n'
-      + '=== TRANSACTIONS ===\n' + (transSummary || 'None') + '\n\n'
-      + '=== STANDINGS ===\n' + standingsCtx + '\n\n'
-      + '=== ALL 86 QUESTS (id | title | reward | type | description) ===\n' + questList + '\n\n'
-      + 'TASK: Analyze the week data and identify which managers completed which quests this week.\n'
-      + 'For each completion found, provide specific evidence from the data.\n'
-      + 'Only award quests that are clearly supported by the data.\n'
-      + 'For commissioner-verified quests (QB Catcher, Special Teams TD, etc.) flag them as NEEDS_VERIFY.\n\n'
-      + 'Return ONLY a valid JSON array like this:\n'
-      + '[{"manager":"Team Name","questId":"q_mightiest","questTitle":"Quest Title","faab":2,"evidence":"scored 142.5 pts, highest in league","needsVerify":false}]\n'
-      + 'Return empty array [] if no quests completed. NO other text, just the JSON array.';
-
-    var response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-
-    var data = await response.json();
-    var text = data.content && data.content[0] && data.content[0].text || '[]';
-
-    // Parse JSON response
-    var clean = text.replace(/```json|```/g, '').trim();
-    var completions = JSON.parse(clean);
-
-    if (status) status.textContent = '✅ Found ' + completions.length + ' quest completions for Week ' + weekNum;
-
-    // Render approval UI
-    renderAuditResults(completions, weekNum);
-
-  } catch(e) {
-    console.error('Audit failed:', e);
-    if (status) { status.textContent = '⚠ Audit failed: ' + e.message; status.style.color = 'var(--red)'; }
-  }
-
-  if (btn) { btn.disabled = false; btn.textContent = '🤖 Run Week ' + weekNum + ' Audit'; }
-}
-
 function renderAuditResults(completions, weekNum) {
   var results = document.getElementById('auditResults');
   if (!results) return;
@@ -5901,7 +5786,7 @@ function advanceToNextWeek(currentWeek) {
   window.scrollTo(0, 0);
 }
 
-function generateCoCommishRecap(weekNum) {
+async function generateCoCommishRecap(weekNum) {
   var statusEl = document.getElementById('recapGenStatus');
   if (statusEl) statusEl.textContent = 'Pulling Sleeper data for Week ' + weekNum + '...';
 
@@ -6884,23 +6769,7 @@ if (typeof SB_KEY === 'undefined') var SB_KEY = 'sb_publishable_UnOF4zXjn_V324h_
 var COT_OS_APP_ID = 'd5073e4c-59a8-424b-a7f6-7cfde9cfa96a';
 var COT_OS_REST   = 'https://onesignal.com/api/v1/notifications';
 
-window.OneSignalDeferred = window.OneSignalDeferred || [];
-OneSignalDeferred.push(function(OneSignal) {
-  OneSignal.init({
-    appId: COT_OS_APP_ID,
-    safari_web_id: '',
-    notifyButton: { enable: false },
-    allowLocalhostAsSecureOrigin: true
-  }).then(function() {
-    var me = typeof getCurrentManager === 'function' ? getCurrentManager() : null;
-    if (me && me.name) {
-      try {
-        OneSignal.User.addTag('manager', me.name.toLowerCase().replace(/[^a-z0-9]/g,''));
-        OneSignal.User.addTag('division', (window.TEAM_DIVISIONS && window.TEAM_DIVISIONS[me.name]) || 'unknown');
-      } catch(e) {}
-    }
-  }).catch(function(e){ console.warn('OneSignal init error:', e); });
-});
+// OneSignal init moved to head script tag
 
 // ── ONESIGNAL SEND HELPERS ────────────────────────────────────────────────────
 // Sends to ALL subscribers (broadcast — used for warrior, recap)
