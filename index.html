@@ -3042,8 +3042,10 @@ function resetWheelData() {
   localStorage.removeItem('wheelHistoryVersion');
   // Also clear Supabase wheel_spins if connected
   if (sbReady()) {
-    SB.from('wheel_spins').delete().neq('id', 0).then(function() {
-      console.log('Supabase wheel_spins cleared');
+    SB.from('wheel_spins').delete().gte('id', '00000000-0000-0000-0000-000000000000').then(function(res) {
+      console.log('Supabase wheel_spins cleared', res);
+    }).catch(function(e) {
+      console.log('Error clearing wheel_spins:', e.message);
     });
   }
   renderWheel();
@@ -5088,9 +5090,11 @@ function renderProfiles() {
       // Check wheel version and clear test spins if needed
       var wheelV = localStorage.getItem('wheelHistoryVersion');
       if (wheelV !== '5') {
-        SB.from('wheel_spins').delete().neq('id', 0).then(function(res) {
+        SB.from('wheel_spins').delete().gte('id', '00000000-0000-0000-0000-000000000000').then(function(res) {
           localStorage.setItem('wheelHistoryVersion', '5');
-          console.log('✅ Cleared test spins from Supabase & bumped version to 5');
+          console.log('✅ Cleared test spins from Supabase & bumped version to 5', res);
+        }).catch(function(e) {
+          console.log('⚠ Wheel cleanup error:', e.message);
         });
       }
       
