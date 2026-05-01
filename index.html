@@ -5087,10 +5087,10 @@ function renderProfiles() {
       
       // Check wheel version and clear test spins if needed
       var wheelV = localStorage.getItem('wheelHistoryVersion');
-      if (wheelV !== '4') {
+      if (wheelV !== '5') {
         SB.from('wheel_spins').delete().neq('id', 0).then(function(res) {
-          localStorage.setItem('wheelHistoryVersion', '4');
-          console.log('✅ Cleared test spins from Supabase & bumped version to 4');
+          localStorage.setItem('wheelHistoryVersion', '5');
+          console.log('✅ Cleared test spins from Supabase & bumped version to 5');
         });
       }
       
