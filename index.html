@@ -3023,7 +3023,17 @@ function getWheelHistory() {
   try {
     // Version check — clear old history that had no manager tracking
     var v = localStorage.getItem('wheelHistoryVersion');
-    if (v !== '3') { localStorage.removeItem('wheelHistory'); localStorage.removeItem('spinDates'); localStorage.setItem('wheelHistoryVersion','3'); }
+    if (v !== '4') { 
+      localStorage.removeItem('wheelHistory'); 
+      localStorage.removeItem('spinDates'); 
+      localStorage.setItem('wheelHistoryVersion','4');
+      // Also clear Supabase wheel_spins
+      if (sbReady()) {
+        SB.from('wheel_spins').delete().neq('id', 0).then(function() {
+          console.log('Cleared test spins from Supabase');
+        });
+      }
+    }
     return JSON.parse(localStorage.getItem('wheelHistory')||'[]');
   } catch(e){ return []; }
 }
