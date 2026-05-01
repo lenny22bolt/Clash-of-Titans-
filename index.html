@@ -222,6 +222,18 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
   body{padding-top:env(safe-area-inset-top)}
 }
 </style>
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script>
+  window.OneSignalDefaultNotificationTitle = 'Clash of Titans';
+  window.OneSignal = window.OneSignal || [];
+  OneSignal.push(function() {
+    OneSignal.init({
+      appId: 'd5073e4c-59a8-424b-a7f6-7cfde9cfa96a',
+      notificationClickHandlerMatch: 'origin'
+    });
+    window.OneSignal.User.PushSubscription.optIn();
+  });
+</script>
 </head>
 <body>
 
@@ -237,7 +249,7 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
     </div>
   </div>
   <div class="hero-meta" id="hmeta">Loading...</div>
-  <div id="signinWrap" style="margin-top:6px"><button onclick="openSignIn()" id="signinBtn" style="font-family:Cinzel,serif;font-size:9px;font-weight:700;letter-spacing:1px;padding:5px 12px;border-radius:20px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer">&#128100; Sign In</button></div>
+  <div id="signinWrap" style="margin-top:6px;display:flex;gap:8px;align-items:center"><button onclick="openSignIn()" id="signinBtn" style="font-family:Cinzel,serif;font-size:9px;font-weight:700;letter-spacing:1px;padding:5px 12px;border-radius:20px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer">&#128100; Sign In</button><button id="bellIcon" onclick="openNotifications()" style="font-family:Cinzel,serif;font-size:14px;border:none;background:none;cursor:pointer;color:var(--gold)">🔔</button></div>
 </div>
 
 <nav class="nav">
@@ -3494,7 +3506,36 @@ var DIV_CRESTS = {north:'crest-north.png',east:'crest-east.png',west:'crest-west
 var DIV_COLORS_SI = {north:'#7BB8E8',east:'#6EDE7E',west:'#FF6B6B',south:'#FFD580'};
 
 function getCurrentManager(){try{return JSON.parse(localStorage.getItem('cotManager')||'null');}catch(e){return null;}}
-function saveManager(m){localStorage.setItem('cotManager',JSON.stringify(m));}
+function saveManager(m){
+  localStorage.setItem('cotManager',JSON.stringify(m));
+  if (window.OneSignal && m && m.name) {
+    OneSignal.User.addTag('manager', m.name);
+    if (TEAM_DIVISIONS && TEAM_DIVISIONS[m.name]) {
+      OneSignal.User.addTag('division', TEAM_DIVISIONS[m.name]);
+    }
+  }
+}
+
+// ── ONE SIGNAL NOTIFICATIONS ───────────────────────────────────
+function osSendBroadcast(title, msg, url) {
+  if (!window.OneSignal) return;
+  OneSignal.Notifications.sendNotification({
+    headings: {en: title},
+    contents: {en: msg},
+    url: url || 'https://lenny22bolt.github.io/Clash-of-Titans-/',
+    big_picture: 'https://lenny22bolt.github.io/Clash-of-Titans-/realm-world-map.png'
+  }).catch(function(e) { console.log('OS broadcast failed:', e); });
+}
+
+function osSendToManager(managerName, title, msg, url) {
+  if (!window.OneSignal) return;
+  OneSignal.Notifications.sendNotification({
+    headings: {en: title},
+    contents: {en: msg},
+    url: url || 'https://lenny22bolt.github.io/Clash-of-Titans-/',
+    filters: [{field: 'tag', key: 'manager', value: managerName}]
+  }).catch(function(e) { console.log('OS manager notification failed:', e); });
+}
 
 function openSignIn() {
   document.getElementById('signinOverlay').style.display = 'flex';
