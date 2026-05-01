@@ -3021,19 +3021,7 @@ WHEEL_SLOTS.forEach(function(s){ for(var i=0;i<s.weight;i++) WHEEL_EXPANDED.push
 
 function getWheelHistory() {
   try {
-    // Version check — clear old history that had no manager tracking
-    var v = localStorage.getItem('wheelHistoryVersion');
-    if (v !== '4') { 
-      localStorage.removeItem('wheelHistory'); 
-      localStorage.removeItem('spinDates'); 
-      localStorage.setItem('wheelHistoryVersion','4');
-      // Also clear Supabase wheel_spins
-      if (sbReady()) {
-        SB.from('wheel_spins').delete().neq('id', 0).then(function() {
-          console.log('Cleared test spins from Supabase');
-        });
-      }
-    }
+    // Version check — handled in Supabase init block
     return JSON.parse(localStorage.getItem('wheelHistory')||'[]');
   } catch(e){ return []; }
 }
@@ -5096,6 +5084,16 @@ function renderProfiles() {
     if (typeof supabase !== 'undefined' && supabase.createClient) {
       SB = supabase.createClient(SB_URL, SB_KEY);
       console.log('✅ Supabase client initialized');
+      
+      // Check wheel version and clear test spins if needed
+      var wheelV = localStorage.getItem('wheelHistoryVersion');
+      if (wheelV !== '4') {
+        SB.from('wheel_spins').delete().neq('id', 0).then(function(res) {
+          localStorage.setItem('wheelHistoryVersion', '4');
+          console.log('✅ Cleared test spins from Supabase & bumped version to 4');
+        });
+      }
+      
       // Load treasury data from Supabase on startup
       SB.from('treasury').select('*').then(function(res) {
         if (!res.error && res.data && res.data.length) {
