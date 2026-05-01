@@ -1360,6 +1360,37 @@ function toggleLoserBids(btn) {
     : btn.textContent.replace('▲ Hide', '▼ Show');
 }
 
+// ── REFRESH TRANSACTIONS FROM SLEEPER ──────────────────────────
+function refreshTransactionsFromSleeper() {
+  var status = document.getElementById('hmeta');
+  if (status) status.textContent = 'Syncing transactions...';
+  
+  // Fetch all 18 weeks of transactions
+  var txPromises = [];
+  for (var w = 0; w < 18; w++) {
+    txPromises.push(safeFetch('/league/'+LID+'/transactions/'+w));
+  }
+  Promise.all(txPromises).then(function(txRes) {
+    var all = txRes.filter(function(t){return t&&Array.isArray(t);}).reduce(function(a,b){return a.concat(b);},[]);
+    var seen = {};
+    S.transactions = all.filter(function(t){ if(seen[t.transaction_id]) return false; seen[t.transaction_id]=1; return true; }).sort(function(a,b){return b.created-a.created;});
+    
+    // Also reload players to ensure names are fresh
+    fetch(BASE+'/players/nfl')
+      .then(function(r){return r.json();})
+      .then(function(p){ 
+        S.players=p||{}; 
+        S.playersLoaded=true; 
+        renderTransactions();
+        if (status) status.textContent = 'Live · Transactions synced · '+new Date().toLocaleTimeString();
+      })
+      .catch(function(){ 
+        renderTransactions();
+        if (status) status.textContent = 'Live · Transactions synced · '+new Date().toLocaleTimeString();
+      });
+  });
+}
+
 
 // ── PICKS ─────────────────────────────────────────────────────
 function renderPicks() {
@@ -2991,6 +3022,8 @@ function showTab(tab, btn) {
   if (tab === 'wheel') setTimeout(renderWheel, 50);
   if (tab === 'rankings') setTimeout(renderRankings, 50);
   if (tab === 'sidepots') setTimeout(renderSidePots, 50);
+  // Auto-refresh transactions from Sleeper API when tab is opened
+  if (tab === 'transactions') refreshTransactionsFromSleeper();
 }
 
 // ── API ───────────────────────────────────────────────────────
@@ -3417,13 +3450,12 @@ Promise.all([
     // Re-render with live data
     renderAll();
 
-    // Load transactions
-    Promise.all([
-      safeFetch('/league/'+LID+'/transactions/0'),
-      safeFetch('/league/'+LID+'/transactions/1'),
-      safeFetch('/league/'+LID+'/transactions/2'),
-      safeFetch('/league/'+LID+'/transactions/3')
-    ]).then(function(txRes) {
+    // Load transactions from all weeks (0-17)
+    var txPromises = [];
+    for (var w = 0; w < 18; w++) {
+      txPromises.push(safeFetch('/league/'+LID+'/transactions/'+w));
+    }
+    Promise.all(txPromises).then(function(txRes) {
       var all = txRes.filter(function(t){return t&&Array.isArray(t);}).reduce(function(a,b){return a.concat(b);},[]);
       var seen = {};
       S.transactions = all.filter(function(t){ if(seen[t.transaction_id]) return false; seen[t.transaction_id]=1; return true; }).sort(function(a,b){return b.created-a.created;});
