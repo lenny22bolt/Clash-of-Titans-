@@ -1129,7 +1129,7 @@ function viewRoster(rosterId, switchTab) {
 
     // Badge row
     + '<div style="display:flex;gap:5px;flex-wrap:wrap">'
-    +   '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(201,168,76,.1);color:var(--gold);border:1px solid var(--gold-border)">🎯 '+_picks+' picks (2026-28)</span>'
+    +   '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(201,168,76,.1);color:var(--gold);border:1px solid var(--gold-border)">🎯 '+_picks+' picks (2027-29)</span>'
     +   (_bio.shame ? '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,107,107,.1);color:var(--red);border:1px solid rgba(255,107,107,.2)">'+_bio.shame+'</span>' : '')
     +   (!_mgr.paid ? '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,179,71,.1);color:var(--amber);border:1px solid rgba(255,179,71,.2)">⏳ Buy-in pending</span>' : '')
     +   (_titan.length ? '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(201,168,76,.15);color:var(--gold);border:1px solid var(--gold-border)">👑 Titan ×'+_titan.length+'</span>' : '')
@@ -1179,7 +1179,7 @@ function viewRoster(rosterId, switchTab) {
   var scoreColor = dynastyScore >= 75 ? 'var(--green)' : dynastyScore >= 55 ? 'var(--gold)' : dynastyScore >= 40 ? 'var(--amber)' : 'var(--red)';
   var scoreLabel = dynastyScore >= 75 ? 'ELITE' : dynastyScore >= 55 ? 'CONTENDER' : dynastyScore >= 40 ? 'REBUILDING' : 'RELOAD MODE';
 
-  // Pick breakdown for 2026-2028
+  // Pick breakdown for 2027-2029
   function pickSummary(season) {
     var p = hpicks[season] || {};
     var cells = [1,2,3].map(function(r){
@@ -1488,7 +1488,7 @@ function renderPicks() {
   var divColors = {1:'#7BB8E8',2:'#FFB347',3:'#6EDE7E',4:'#FF6B6B'};
 
   var html = '<div style="background:var(--navy-card);border:1px solid var(--gold-border);border-radius:10px;padding:10px 16px;margin-bottom:1.2rem;font-family:Cinzel,serif;font-size:11px;color:var(--dim)">'
-    + '<strong style="color:var(--gold)">All Draft Picks by Team · 2026–2028</strong><br>'
+    + '<strong style="color:var(--gold)">All Draft Picks by Team · 2027–2029</strong><br>'
     + '<span style="color:var(--text)">White</span> = own pick &nbsp;·&nbsp; <span style="color:var(--amber)">Amber</span> = acquired &nbsp;·&nbsp; Numbers show pick count · Hover for origins'
     + '</div>';
 
