@@ -1360,38 +1360,6 @@ function toggleLoserBids(btn) {
     : btn.textContent.replace('▲ Hide', '▼ Show');
 }
 
-// ── REFRESH TRANSACTIONS FROM SLEEPER ──────────────────────────
-function refreshTransactionsFromSleeper() {
-  var status = document.getElementById('hmeta');
-  if (status) status.textContent = 'Syncing transactions...';
-  
-  // Fetch all 18 weeks of transactions
-  var txPromises = [];
-  for (var w = 0; w < 18; w++) {
-    txPromises.push(safeFetch('/league/'+LID+'/transactions/'+w));
-  }
-  Promise.all(txPromises).then(function(txRes) {
-    var all = txRes.filter(function(t){return t&&Array.isArray(t);}).reduce(function(a,b){return a.concat(b);},[]);
-    var seen = {};
-    S.transactions = all.filter(function(t){ if(seen[t.transaction_id]) return false; seen[t.transaction_id]=1; return true; }).sort(function(a,b){return b.created-a.created;});
-    
-    // Also reload players to ensure names are fresh
-    fetch(BASE+'/players/nfl')
-      .then(function(r){return r.json();})
-      .then(function(p){ 
-        S.players=p||{}; 
-        S.playersLoaded=true; 
-        renderTransactions();
-        if (status) status.textContent = 'Live · Transactions synced · '+new Date().toLocaleTimeString();
-      })
-      .catch(function(){ 
-        renderTransactions();
-        if (status) status.textContent = 'Live · Transactions synced · '+new Date().toLocaleTimeString();
-      });
-  });
-}
-
-
 // ── PICKS ─────────────────────────────────────────────────────
 function renderPicks() {
   var wrap = document.getElementById('pklist');
@@ -1571,25 +1539,24 @@ function renderDraft2026() {
   var wrap = document.getElementById('draft2026wrap');
   var traded = S.picks || [];
   var overrides = getDraftOverrides();
-  var seasons = ['2026']; // 2026 only — future years in Draft Picks tab
+  var seasons = ['2027', '2028']; // 2026 draft is complete, show future years
   var rounds  = [1,2,3];
 
   var html = '<div style="background:var(--navy-card);border-radius:12px;border:1px solid var(--gold-border);padding:14px 18px;margin-bottom:1.5rem;font-family:Cinzel,serif;font-size:12px;color:var(--dim);line-height:1.9">'
-    + '<div style="color:var(--gold);font-weight:700;font-size:13px;margin-bottom:4px">2026 Rookie Draft · May 1st @ 7:30 PM</div>'
-    + 'Round 1: 10 min/pick · Rounds 2-3: 5 min/pick<br>'
-    + 'Picks 1.01-1.08: Lowest PF (non-playoff) · 1.09-1.16: Reverse playoff finish<br>'
+    + '<div style="color:var(--gold);font-weight:700;font-size:13px;margin-bottom:4px">Future Rookie Drafts</div>'
+    + 'Track your 2027 and 2028 draft capital here. 2026 draft is complete.<br>'
     + '<span style="color:var(--amber)">Orange border = traded pick</span> &nbsp;·&nbsp; Click any pick to override'
     + '</div>';
 
   // Season tabs
   html += '<div style="display:flex;gap:8px;margin-bottom:1.2rem" id="draftTabs">';
   seasons.forEach(function(s) {
-    html += '<button id="dstab_'+s+'" onclick="switchDraftSeason(\''+s+'\')" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:8px 18px;border-radius:20px;cursor:pointer;border:1px solid '+(s==='2026'?'var(--gold)':'var(--gold-border)')+';background:'+(s==='2026'?'var(--gold-dim)':'transparent')+';color:'+(s==='2026'?'var(--gold)':'var(--dim)')+'">'+s+'</button>';
+    html += '<button id="dstab_'+s+'" onclick="switchDraftSeason(\''+s+'\')" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:8px 18px;border-radius:20px;cursor:pointer;border:1px solid '+(s==='2027'?'var(--gold)':'var(--gold-border)')+';background:'+(s==='2027'?'var(--gold-dim)':'transparent')+';color:'+(s==='2027'?'var(--gold)':'var(--dim)')+'">'+s+'</button>';
   });
   html += '</div>';
 
-  // Always default to 2026 on first render
-  var activeSeason = '2026';
+  // Always default to 2027 on first render
+  var activeSeason = '2027';
   seasons.forEach(function(season) {
     var sp = traded.filter(function(p){return String(p.season)===season;});
     var display = season===activeSeason ? 'block' : 'none';
@@ -1659,7 +1626,7 @@ function renderDraft2026() {
 }
 
 function switchDraftSeason(s) {
-  ['2026','2027','2028'].forEach(function(x) {
+  ['2027','2028'].forEach(function(x) {
     var el=document.getElementById('dseason_'+x), tb=document.getElementById('dstab_'+x);
     if(el) el.style.display = x===s?'block':'none';
     if(tb){ tb.style.background=x===s?'var(--gold-dim)':'transparent'; tb.style.color=x===s?'var(--gold)':'var(--dim)'; tb.style.borderColor=x===s?'var(--gold)':'var(--gold-border)'; }
@@ -3022,8 +2989,6 @@ function showTab(tab, btn) {
   if (tab === 'wheel') setTimeout(renderWheel, 50);
   if (tab === 'rankings') setTimeout(renderRankings, 50);
   if (tab === 'sidepots') setTimeout(renderSidePots, 50);
-  // Auto-refresh transactions from Sleeper API when tab is opened
-  if (tab === 'transactions') refreshTransactionsFromSleeper();
 }
 
 // ── API ───────────────────────────────────────────────────────
@@ -3457,8 +3422,11 @@ Promise.all([
     }
     Promise.all(txPromises).then(function(txRes) {
       var all = txRes.filter(function(t){return t&&Array.isArray(t);}).reduce(function(a,b){return a.concat(b);},[]);
+      console.log('Total transactions from Sleeper:', all.length);
+      console.log('All transaction IDs:', all.map(function(t){return t.transaction_id;}).join(', '));
       var seen = {};
       S.transactions = all.filter(function(t){ if(seen[t.transaction_id]) return false; seen[t.transaction_id]=1; return true; }).sort(function(a,b){return b.created-a.created;});
+      console.log('After dedup:', S.transactions.length);
       renderTransactions();
     });
 
@@ -3540,10 +3508,14 @@ var DIV_COLORS_SI = {north:'#7BB8E8',east:'#6EDE7E',west:'#FF6B6B',south:'#FFD58
 function getCurrentManager(){try{return JSON.parse(localStorage.getItem('cotManager')||'null');}catch(e){return null;}}
 function saveManager(m){
   localStorage.setItem('cotManager',JSON.stringify(m));
-  if (window.OneSignal && m && m.name) {
-    OneSignal.User.addTag('manager', m.name);
-    if (TEAM_DIVISIONS && TEAM_DIVISIONS[m.name]) {
-      OneSignal.User.addTag('division', TEAM_DIVISIONS[m.name]);
+  if (window.OneSignal && m && m.name && OneSignal.User) {
+    try {
+      OneSignal.User.addTag('manager', m.name);
+      if (TEAM_DIVISIONS && TEAM_DIVISIONS[m.name]) {
+        OneSignal.User.addTag('division', TEAM_DIVISIONS[m.name]);
+      }
+    } catch(e) {
+      console.log('OneSignal tag error:', e);
     }
   }
 }
