@@ -544,9 +544,9 @@ var DRAFT_ORDER = [
 
 var HARDCODED_PICKS = {
   "IceMonkey": {
-    "2027": { 1:[], 2:[], 3:["own"] },
+    "2027": { 1:[], 2:["own"], 3:["own"] },
     "2028": { 1:[], 2:["from SteveG25"], 3:["own"] },
-    "2029": { 1:["own"], 2:["own"], 3:[] }
+    "2029": { 1:["own"], 2:["own"], 3:["own"] }
   },
   "Fenrir's Fury": {
     "2027": { 1:["own"], 2:["own"], 3:["own"] },
@@ -554,13 +554,13 @@ var HARDCODED_PICKS = {
     "2029": { 1:["own"], 2:["own"], 3:["own"] }
   },
   "Warrior Shohei Goatani": {
-    "2027": { 1:["from IceMonkey"], 2:["own"], 3:["own"] },
+    "2027": { 1:["from IceMonkey","own"], 2:["own"], 3:["own"] },
     "2028": { 1:["own"], 2:["own"], 3:["own"] },
-    "2029": { 1:["own"], 2:["own"], 3:[] }
+    "2029": { 1:["own"], 2:["own"], 3:["own"] }
   },
   "Orion Leaf": {
-    "2027": { 1:["own"], 2:["own"], 3:["from vandavey"] },
-    "2028": { 1:["own"], 2:["own"], 3:["own"] },
+    "2027": { 1:["own"], 2:["own"], 3:["own"] },
+    "2028": { 1:["own"], 2:["own","from Dsides"], 3:["own"] },
     "2029": { 1:["own"], 2:["own"], 3:["own"] }
   },
   "Hermes Hail Marys": {
@@ -568,28 +568,28 @@ var HARDCODED_PICKS = {
     "2028": { 1:[], 2:[], 3:[] },
     "2029": { 1:["own"], 2:["own"], 3:["own"] }
   },
+  "Wrath of Moctezuma": {
+    "2027": { 1:["own"], 2:["own"], 3:["from vandavey","own"] },
+    "2028": { 1:["own"], 2:["own"], 3:["own"] },
+    "2029": { 1:["own"], 2:["own"], 3:["own"] }
+  },
   "Beercules the Destroyer": {
     "2027": { 1:["own"], 2:["own"], 3:["own"] },
     "2028": { 1:["own"], 2:["own"], 3:["own"] },
     "2029": { 1:["own"], 2:["own"], 3:["own"] }
   },
-  "Wrath of Moctezuma": {
-    "2027": { 1:["own"], 2:["own"], 3:["from vandavey"] },
-    "2028": { 1:["own"], 2:["own"], 3:["own"] },
-    "2029": { 1:["own"], 2:["own"], 3:["own"] }
-  },
   "Stefanos the Spartan King": {
-    "2027": { 1:["own"], 2:["from Dsides"], 3:["own"] },
+    "2027": { 1:["own"], 2:["from Dsides","own"], 3:["own"] },
     "2028": { 1:["own"], 2:["own"], 3:["own"] },
     "2029": { 1:["own"], 2:["own"], 3:["own"] }
   },
   "Lord of Dreams": {
-    "2027": { 1:["own"], 2:[], 3:["own"] },
+    "2027": { 1:[], 2:[], 3:["own"] },
     "2028": { 1:["own"], 2:["own"], 3:["own"] },
     "2029": { 1:["own"], 2:["own"], 3:["own"] }
   },
   "Notchotaur": {
-    "2027": { 1:["own"], 2:["own"], 3:["own"] },
+    "2027": { 1:[], 2:["own"], 3:["own"] },
     "2028": { 1:["own"], 2:["own"], 3:["own"] },
     "2029": { 1:["own"], 2:["own"], 3:["own"] }
   },
@@ -599,8 +599,8 @@ var HARDCODED_PICKS = {
     "2029": { 1:["own"], 2:["own"], 3:["own"] }
   },
   "Talon": {
-    "2027": { 1:["own","from Notchotaur","from Lord of Dreams","from SteveG25","from Dsides","from Moctezuma"], 2:["own","from Lord of Dreams","from IceMonkey"], 3:["own","from Dsides"] },
-    "2028": { 1:["own","from SteveG25","from IceMonkey","from Dsides"], 2:["own","from lennylee22","from Fenrir's Fury","from IceMonkey"], 3:["own","from Dsides"] },
+    "2027": { 1:["from Notchotaur","from Lord of Dreams","from SteveG25","from Dsides","from Wrath of Moctezuma","own"], 2:["from Lord of Dreams","from IceMonkey","own"], 3:["from Dsides","own"] },
+    "2028": { 1:["from SteveG25","from IceMonkey","from Dsides","own"], 2:["from Heir of Zeus","from Fenrir's Fury","from IceMonkey","own"], 3:["from Dsides","own"] },
     "2029": { 1:["own"], 2:["own"], 3:["own"] }
   },
   "ChatG-TDs": {
@@ -623,6 +623,16 @@ var HARDCODED_PICKS = {
     "2028": { 1:["own"], 2:[], 3:["own"] },
     "2029": { 1:["own"], 2:["own"], 3:["own"] }
   }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SEAMLESS DRAFT PICKS UPDATE SYSTEM v1.0
+// Update this config each offseason to shift to next year
+// ═══════════════════════════════════════════════════════════════════════════════
+var DRAFT_CONFIG = {
+  currentSeason: 2026,        // The completed draft year
+  displayYears: [2027, 2028, 2029],  // Show these years in the grid
+  nextDraftYear: 2027         // Will be drafted in offseason
 };
 
 var KNOWN_TRADES = [
