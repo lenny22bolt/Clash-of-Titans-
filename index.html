@@ -305,7 +305,7 @@ document.addEventListener('DOMContentLoaded', function() {
   <button class="nb"     onclick="showTab('transactions',this)">Transactions</button>
   <button class="nb"     onclick="showTab('picks',this)">Draft Picks</button>
   <button class="nb"     onclick="showTab('history',this)">S1 History</button>
-  <button class="nb"     onclick="showTab('draft2026',this)">2026 Draft</button>
+  <button class="nb" id="draft2027NavBtn" style="display:none" onclick="showTab('draft2027',this)">2027 Draft</button>
   <button class="nb" id="liveDraftNavBtn" onclick="showTab('livedraft',this)">&#127944; Live Draft</button>
   <button class="nb"     onclick="showTab('treasury',this)">🏛 Treasury</button>
   <button class="nb"     onclick="showTab('fallen',this)">Fallen</button>
@@ -326,8 +326,8 @@ document.addEventListener('DOMContentLoaded', function() {
   <div class="sec" id="sec-transactions"><div class="stitle">Recent Transactions</div><div class="txl" id="txlist"></div></div>
   <div class="sec" id="sec-picks"><div class="stitle">Traded Draft Picks</div><div id="pklist"></div></div>
   <div class="sec" id="sec-history"><div class="stitle">Season 1 — Final Records</div><div id="hwrap"></div></div>
-  <div class="sec" id="sec-draft2026"><div class="stitle">2026 Rookie Draft Order</div><div id="draft2026wrap"></div></div>
-  <div class="sec" id="sec-livedraft"><div class="stitle">&#127944; 2026 Rookie Draft — Live Board</div><div id="livedraftwrap"></div></div>
+  <div class="sec" id="sec-draft2027" style="display:none"><div class="stitle">2027 Rookie Draft Order</div><div id="draft2027wrap"></div></div>
+  <div class="sec" id="sec-livedraft"><div class="stitle">&#127944; 2027 Rookie Draft — Live Board</div><div id="livedraftwrap"></div></div>
   <div class="sec" id="sec-treasury"><div class="stitle">🏛 Titan Treasury</div><div id="treasurywrap"></div></div>
   <div class="sec" id="sec-fallen"><div class="stitle">Fallen Warriors</div><div id="fallenwrap"></div></div>
   <div class="sec" id="sec-power">
@@ -1659,15 +1659,36 @@ function renderHistory() {
 function getDraftOverrides() { try { return JSON.parse(sessionStorage.getItem('draftOv')||'{}'); } catch(e) { return {}; } }
 function saveDraftOverrides(o) { sessionStorage.setItem('draftOv', JSON.stringify(o)); }
 
-function renderDraft2026() {
-  var wrap = document.getElementById('draft2026wrap');
+function switchDraftSeason(s) {
+  ['2027','2028','2029'].forEach(function(x) {
+    var el=document.getElementById('dseason_'+x), tb=document.getElementById('dstab_'+x);
+    if(el) el.style.display = x===s?'block':'none';
+    if(tb){ tb.style.background=x===s?'var(--gold-dim)':'transparent'; tb.style.color=x===s?'var(--gold)':'var(--dim)'; tb.style.borderColor=x===s?'var(--gold)':'var(--gold-border)'; }
+  });
+}
+
+function editPick(season, round, idx, cur) {
+  var val = prompt('Override pick '+season.slice(2)+'.'+('0'+(idx+1)).slice(-2)+' (leave blank to reset):', cur);
+  if (val === null) return;
+  var ov = getDraftOverrides();
+  var key = season+'_'+round+'_'+idx;
+  if (val.trim() === '') delete ov[key]; else ov[key] = val.trim();
+  saveDraftOverrides(ov);
+  renderDraft2027();
+}
+
+function clearDraftOv() { if(confirm('Clear all overrides?')){ sessionStorage.removeItem('draftOv'); renderDraft2027(); } }
+
+// ── 2027 DRAFT ────────────────────────────────────────────────────────────
+function renderDraft2027() {
+  var wrap = document.getElementById('draft2027wrap');
   var traded = S.picks || [];
   var overrides = getDraftOverrides();
-  var seasons = ['2026']; // 2026 only — future years in Draft Picks tab
+  var seasons = ['2027']; // 2027 only — future years in Draft Picks tab
   var rounds  = [1,2,3];
 
   var html = '<div style="background:var(--navy-card);border-radius:12px;border:1px solid var(--gold-border);padding:14px 18px;margin-bottom:1.5rem;font-family:Cinzel,serif;font-size:12px;color:var(--dim);line-height:1.9">'
-    + '<div style="color:var(--gold);font-weight:700;font-size:13px;margin-bottom:4px">2026 Rookie Draft · May 1st @ 7:30 PM</div>'
+    + '<div style="color:var(--gold);font-weight:700;font-size:13px;margin-bottom:4px">2027 Rookie Draft · May 1st @ 7:30 PM</div>'
     + 'Round 1: 10 min/pick · Rounds 2-3: 5 min/pick<br>'
     + 'Picks 1.01-1.08: Lowest PF (non-playoff) · 1.09-1.16: Reverse playoff finish<br>'
     + '<span style="color:var(--amber)">Orange border = traded pick</span>'
@@ -1676,17 +1697,17 @@ function renderDraft2026() {
   // Season tabs
   html += '<div style="display:flex;gap:8px;margin-bottom:1.2rem" id="draftTabs">';
   seasons.forEach(function(s) {
-    html += '<button id="dstab_'+s+'" onclick="switchDraftSeason(\''+s+'\')" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:8px 18px;border-radius:20px;cursor:pointer;border:1px solid '+(s==='2026'?'var(--gold)':'var(--gold-border)')+';background:'+(s==='2026'?'var(--gold-dim)':'transparent')+';color:'+(s==='2026'?'var(--gold)':'var(--dim)')+'">'+s+'</button>';
+    html += '<button id="dstab_'+s+'" onclick="switchDraftSeason(\''+s+'\')" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:8px 18px;border-radius:20px;cursor:pointer;border:1px solid '+(s==='2027'?'var(--gold)':'var(--gold-border)')+';background:'+(s==='2027'?'var(--gold-dim)':'transparent')+';color:'+(s==='2027'?'var(--gold)':'var(--dim)')+'">'+s+'</button>';
   });
   html += '</div>';
 
-  // Always default to 2026 on first render
-  var activeSeason = '2026';
+  // Always default to 2027 on first render
+  var activeSeason = '2027';
   seasons.forEach(function(season) {
     var sp = traded.filter(function(p){return String(p.season)===season;});
     var display = season===activeSeason ? 'block' : 'none';
     html += '<div id="dseason_'+season+'" style="display:'+display+'">';
-    if (season !== '2026' && sp.length === 0) {
+    if (season !== '2027' && sp.length === 0) {
       html += noData('No traded picks for '+season+' yet.');
     } else {
       rounds.forEach(function(round) {
@@ -1695,7 +1716,7 @@ function renderDraft2026() {
           var yr      = season.slice(2);
           var pickStr = yr+'.'+('0'+(i+1)).slice(-2);
           var ovKey   = season+'_'+round+'_'+i;
-          var origTeam = season==='2026' ? DRAFT_ORDER[i] : ('Pick '+pickStr);
+          var origTeam = season==='2027' ? DRAFT_ORDER[i] : ('Pick '+pickStr);
 
           // Find roster matching orig team
           var origR = S.rosters.find(function(r){ var u=getUser(r.owner_id); return tname(r,u)===origTeam; });
@@ -1747,29 +1768,8 @@ function renderDraft2026() {
     html += '</div>';
   });
 
-  // override footer removed — commish only via Co-Commish tab
   wrap.innerHTML = html;
 }
-
-function switchDraftSeason(s) {
-  ['2027','2028','2029'].forEach(function(x) {
-    var el=document.getElementById('dseason_'+x), tb=document.getElementById('dstab_'+x);
-    if(el) el.style.display = x===s?'block':'none';
-    if(tb){ tb.style.background=x===s?'var(--gold-dim)':'transparent'; tb.style.color=x===s?'var(--gold)':'var(--dim)'; tb.style.borderColor=x===s?'var(--gold)':'var(--gold-border)'; }
-  });
-}
-
-function editPick(season, round, idx, cur) {
-  var val = prompt('Override pick '+season.slice(2)+'.'+('0'+(idx+1)).slice(-2)+' (leave blank to reset):', cur);
-  if (val === null) return;
-  var ov = getDraftOverrides();
-  var key = season+'_'+round+'_'+idx;
-  if (val.trim() === '') delete ov[key]; else ov[key] = val.trim();
-  saveDraftOverrides(ov);
-  renderDraft2026();
-}
-
-function clearDraftOv() { if(confirm('Clear all overrides?')){ sessionStorage.removeItem('draftOv'); renderDraft2026(); } }
 
 // ── LIVE DRAFT BOARD ──────────────────────────────────────────────────────────
 var LIVE_DRAFT_TIMER = null;
@@ -4228,6 +4228,7 @@ function renderPowerRankings() {
     var p26 = [1,2,3].map(function(r){return pickCount('2026',r);});
     var p27 = [1,2,3].map(function(r){return pickCount('2027',r);});
     var p28 = [1,2,3].map(function(r){return pickCount('2028',r);});
+    var p29 = [1,2,3].map(function(r){return pickCount('2029',r);});
 
     html += '<div style="background:linear-gradient(135deg,var(--navy-card),var(--navy-mid));border-radius:14px;border:1px solid '+(rank<=3?'var(--gold-border)':'rgba(255,255,255,0.06)')+';overflow:hidden;margin-bottom:12px">'
       // Header row
@@ -4268,11 +4269,11 @@ function renderPowerRankings() {
       // Pick grid + strengths/concerns
       + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0">'
       +   '<div style="padding:10px 14px;border-right:1px solid rgba(255,255,255,0.04)">'
-      +     '<div style="font-family:Cinzel,serif;font-size:8px;letter-spacing:2px;color:var(--gold);margin-bottom:6px">PICK CAPITAL</div>'
+      +     '<div style="font-family:Cinzel,serif;font-size:8px;letter-spacing:2px;color:var(--gold);margin-bottom:6px">PICK CAPITAL (2027-2029)</div>'
       +     '<div style="font-size:11px;color:var(--dim);font-family:Cinzel,serif;line-height:2">'
-      +       '<span style="color:#7BB8E8">2026</span> R1:'+p26[0]+' R2:'+p26[1]+' R3:'+p26[2]+' &nbsp;'
-      +       '<span style="color:var(--dim)">2027</span> R1:'+p27[0]+' R2:'+p27[1]+' R3:'+p27[2]+' &nbsp;'
-      +       '<span style="color:var(--dim)">2028</span> R1:'+p28[0]+' R2:'+p28[1]+' R3:'+p28[2]
+      +       '<span style="color:#7BB8E8">2027</span> R1:'+p27[0]+' R2:'+p27[1]+' R3:'+p27[2]+' &nbsp;'
+      +       '<span style="color:var(--dim)">2028</span> R1:'+p28[0]+' R2:'+p28[1]+' R3:'+p28[2]+' &nbsp;'
+      +       '<span style="color:var(--dim)">2029</span> R1:'+p29[0]+' R2:'+p29[1]+' R3:'+p29[2]
       +     '</div>'
       +   '</div>'
       +   '<div style="padding:10px 14px">'
@@ -4688,7 +4689,7 @@ function renderAll() {
   renderPicks();
   renderTransactions();
   renderHistory();
-  renderDraft2026();
+  renderDraft2027();
   renderTreasury();
   renderFallen();
   renderQuests();
