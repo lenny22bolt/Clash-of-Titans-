@@ -1045,27 +1045,46 @@ function viewRoster(rosterId, switchTab) {
   if (!starters.length && !all.length) html += '<p style="padding:1rem;color:var(--dim);font-size:13px">No roster data yet — season has not started.</p>';
 
   // ── DYNASTY OUTLOOK ──────────────────────────────────────────
-  // Try to match team name to HARDCODED_PICKS key
-  var hpicks = HARDCODED_PICKS[tn] || {};
-  if (!Object.keys(hpicks).length) {
-    // Try resolving via USERNAME_TO_TEAM in reverse
-    for (var hk in HARDCODED_PICKS) {
-      if (hk.toLowerCase() === tn.toLowerCase() ||
-          tn.toLowerCase().indexOf(hk.toLowerCase().split(' ')[0]) !== -1 ||
-          hk.toLowerCase().indexOf(tn.toLowerCase().split(' ')[0]) !== -1) {
-        hpicks = HARDCODED_PICKS[hk]; break;
+  // Build pick summary from S.picks (API data) — more accurate than hardcoded
+  var picksBySeasonRound = {}; // key: "2027_1", value: count
+  var totalPicks = 0, r1count = 0, futureR1 = 0;
+  
+  if (myRoster && S.picks && Array.isArray(S.picks)) {
+    S.picks.forEach(function(p) {
+      // Ensure robust comparison: convert both to numbers for safety
+      var pOwnerId = parseInt(p.owner_id, 10);
+      var myRosterId = parseInt(myRoster.roster_id, 10);
+      if (pOwnerId === myRosterId) {
+        var key = p.season + '_' + p.round;
+        picksBySeasonRound[key] = (picksBySeasonRound[key] || 0) + 1;
+        totalPicks++;
+        if(p.round === 1) r1count++;
+        if(p.round === 1 && (p.season === 2027 || p.season === 2028)) futureR1++;
+      }
+    });
+  }
+  
+  // Fallback to HARDCODED_PICKS if no API data
+  if(totalPicks === 0) {
+    var hpicks = HARDCODED_PICKS[tn] || {};
+    if (!Object.keys(hpicks).length) {
+      for (var hk in HARDCODED_PICKS) {
+        if (hk.toLowerCase() === tn.toLowerCase() ||
+            tn.toLowerCase().indexOf(hk.toLowerCase().split(' ')[0]) !== -1 ||
+            hk.toLowerCase().indexOf(tn.toLowerCase().split(' ')[0]) !== -1) {
+          hpicks = HARDCODED_PICKS[hk]; break;
+        }
       }
     }
-  }
-  var totalPicks = 0, r1count = 0, futureR1 = 0;
-  ['2026','2027','2028'].forEach(function(s){
-    [1,2,3].forEach(function(r){
-      var arr = (hpicks[s]&&hpicks[s][r])||[];
-      totalPicks += arr.length;
-      if(r===1) r1count += arr.length;
-      if(r===1 && (s==='2027'||s==='2028')) futureR1 += arr.length;
+    ['2026','2027','2028'].forEach(function(s){
+      [1,2,3].forEach(function(r){
+        var arr = (hpicks[s]&&hpicks[s][r])||[];
+        totalPicks += arr.length;
+        if(r===1) r1count += arr.length;
+        if(r===1 && (s==='2027'||s==='2028')) futureR1 += arr.length;
+      });
     });
-  });
+  }
   var s1rec  = getS1ByTeamName(tn) || getS1(u);
   var s1wins = s1rec ? s1rec.w : 0;
   var s1pts  = s1rec ? s1rec.pts : 0;
@@ -1081,16 +1100,13 @@ function viewRoster(rosterId, switchTab) {
   var scoreColor = dynastyScore >= 75 ? 'var(--green)' : dynastyScore >= 55 ? 'var(--gold)' : dynastyScore >= 40 ? 'var(--amber)' : 'var(--red)';
   var scoreLabel = dynastyScore >= 75 ? 'ELITE' : dynastyScore >= 55 ? 'CONTENDER' : dynastyScore >= 40 ? 'REBUILDING' : 'RELOAD MODE';
 
-  // Pick breakdown for 2026-2028
+  // Pick breakdown for 2027-2029 (from API data)
   function pickSummary(season) {
-    var p = hpicks[season] || {};
     var cells = [1,2,3].map(function(r){
-      var arr = p[r]||[];
-      if(!arr.length) return '<span style="color:rgba(100,100,100,0.3)">—</span>';
-      var hasAcq = arr.some(function(x){return x.indexOf('from ')===0;});
-      var hasOwn = arr.some(function(x){return x.indexOf('own')===0;});
-      var col = hasAcq&&hasOwn?'var(--gold)':hasAcq?'var(--amber)':'var(--text)';
-      return '<span style="color:'+col+';font-weight:700">'+arr.length+'</span>';
+      var key = season + '_' + r;
+      var count = picksBySeasonRound[key] || 0;
+      if(!count) return '<span style="color:rgba(100,100,100,0.3)">—</span>';
+      return '<span style="color:var(--gold);font-weight:700">'+count+'</span>';
     });
     return cells.join('<span style="color:var(--dim);margin:0 2px">/</span>');
   }
@@ -1124,12 +1140,12 @@ function viewRoster(rosterId, switchTab) {
     + '</div>'
     // Pick grid
     + '<div style="font-family:Cinzel,serif;font-size:9px;letter-spacing:2px;color:var(--gold);margin-bottom:8px">DRAFT CAPITAL · R1/R2/R3</div>'
+    // Pick grid - show 2027-2029 (current trading period)
     + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">'
-    +   ['2026','2027','2028'].map(function(s){
-          var yr = s;
-          var hasAny = [1,2,3].some(function(r){return (hpicks[s]&&hpicks[s][r]&&hpicks[s][r].length>0);});
+    +   ['2027','2028','2029'].map(function(s){
+          var hasAny = [1,2,3].some(function(r){return (picksBySeasonRound[s+'_'+r]||0)>0;});
           return '<div style="background:var(--navy-mid);border-radius:8px;border:1px solid '+(hasAny?'var(--gold-border)':'rgba(255,255,255,0.04)')+';padding:10px;text-align:center">'
-            +'<div style="font-family:Cinzel,serif;font-size:10px;color:var(--gold);margin-bottom:6px">'+yr+'</div>'
+            +'<div style="font-family:Cinzel,serif;font-size:10px;color:var(--gold);margin-bottom:6px">'+s+'</div>'
             +'<div style="font-size:16px">'+pickSummary(s)+'</div>'
             +'</div>';
         }).join('')
@@ -1155,7 +1171,10 @@ function viewRoster(rosterId, switchTab) {
     var pickMap = {}; // Group by season+round
     S.picks.forEach(function(p) {
       // Check if this roster owns this pick (either originally or acquired)
-      if (p.owner_id === myRoster.roster_id) {
+      // Ensure robust comparison: convert both to numbers for safety
+      var pOwnerId = parseInt(p.owner_id, 10);
+      var myRosterId = parseInt(myRoster.roster_id, 10);
+      if (pOwnerId === myRosterId) {
         var key = p.season + '_' + p.round;
         if (!pickMap[key]) pickMap[key] = [];
         pickMap[key].push(p);
@@ -1170,9 +1189,11 @@ function viewRoster(rosterId, switchTab) {
           ownedCount++;
           var pickLabel = season.slice(2)+'.R'+round;
           var pickName = season + ' Round ' + round;
-          var isAcquired = p.roster_id !== p.previous_owner_id;
+          var pRosterId = parseInt(p.roster_id, 10);
+          var pPrevOwnerId = parseInt(p.previous_owner_id, 10);
+          var isAcquired = pRosterId !== pPrevOwnerId;
           var origin = isAcquired ? (function(){
-            var orig = S.rosters && S.rosters.find(function(r){return r.roster_id===p.previous_owner_id;});
+            var orig = S.rosters && S.rosters.find(function(r){return r.roster_id===pPrevOwnerId;});
             var ou = orig && getUser(orig.owner_id);
             return orig ? tname(orig, ou) : 'Acquired';
           })() : 'Original pick';
