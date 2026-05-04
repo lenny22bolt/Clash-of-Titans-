@@ -279,7 +279,7 @@ html{scroll-behavior:smooth;height:100%;overflow-x:hidden}
   <div class="sec" id="sec-transactions"><div class="stitle">Recent Transactions</div><div class="txl" id="txlist"></div></div>
   <div class="sec" id="sec-picks"><div class="stitle">Traded Draft Picks</div><div id="pklist"></div></div>
   <div class="sec" id="sec-history"><div class="stitle">Season 1 — Final Records</div><div id="hwrap"></div></div>
-  <div class="sec" id="sec-draft2026"><div class="stitle">2026 Rookie Draft Order</div><div id="draft2026wrap"></div></div>
+  <div class="sec" id="sec-draft2026"><div class="stitle">Draft Picks & Capital</div><div id="draft2026wrap"></div></div>
   <div class="sec" id="sec-treasury"><div class="stitle">🏛 Titan Treasury</div><div id="treasurywrap"></div></div>
   <div class="sec" id="sec-fallen"><div class="stitle">Fallen Warriors</div><div id="fallenwrap"></div></div>
   <div class="sec" id="sec-power">
@@ -1363,7 +1363,7 @@ function toggleLoserBids(btn) {
 // ── PICKS ─────────────────────────────────────────────────────
 function renderPicks() {
   var wrap = document.getElementById('pklist');
-  var SEASONS = ['2026','2027','2028'];
+  var SEASONS = ['2027','2028','2029'];
   var divOrder = {
     'Orion Leaf':1,"Fenrir's Fury":1,'Warrior Shohei Goatani':1,'IceMonkey':1,
     'Hermes Hail Marys':2,'Wrath of Moctezuma':2,'Beercules the Destroyer':2,'Stefanos the Spartan King':2,
@@ -1374,16 +1374,16 @@ function renderPicks() {
   var divColors = {1:'#7BB8E8',2:'#FFB347',3:'#6EDE7E',4:'#FF6B6B'};
 
   var html = '<div style="background:var(--navy-card);border:1px solid var(--gold-border);border-radius:10px;padding:10px 16px;margin-bottom:1.2rem;font-family:Cinzel,serif;font-size:11px;color:var(--dim)">'
-    + '<strong style="color:var(--gold)">All Draft Picks by Team · 2026–2028</strong><br>'
+    + '<strong style="color:var(--gold)">All Draft Picks by Team · 2027–2029</strong><br>'
     + '<span style="color:var(--text)">White</span> = own pick &nbsp;·&nbsp; <span style="color:var(--amber)">Amber</span> = acquired &nbsp;·&nbsp; Numbers show pick count · Hover for origins'
     + '</div>';
 
   // Column headers
   html += '<div style="display:grid;grid-template-columns:180px repeat(9,1fr);gap:4px;padding:5px 10px 3px;font-family:Cinzel,serif;font-size:8px;letter-spacing:1px;color:var(--dim);text-transform:uppercase;border-bottom:1px solid var(--gold-border);margin-bottom:6px">'
     + '<div></div>'
-    + '<div style="text-align:center;color:#7BB8E8">26<br>R1</div><div style="text-align:center;color:#7BB8E8">26<br>R2</div><div style="text-align:center;color:#7BB8E8">26<br>R3</div>'
-    + '<div style="text-align:center;color:var(--dim)">27<br>R1</div><div style="text-align:center;color:var(--dim)">27<br>R2</div><div style="text-align:center;color:var(--dim)">27<br>R3</div>'
+    + '<div style="text-align:center;color:#7BB8E8">27<br>R1</div><div style="text-align:center;color:#7BB8E8">27<br>R2</div><div style="text-align:center;color:#7BB8E8">27<br>R3</div>'
     + '<div style="text-align:center;color:var(--dim)">28<br>R1</div><div style="text-align:center;color:var(--dim)">28<br>R2</div><div style="text-align:center;color:var(--dim)">28<br>R3</div>'
+    + '<div style="text-align:center;color:var(--dim)">29<br>R1</div><div style="text-align:center;color:var(--dim)">29<br>R2</div><div style="text-align:center;color:var(--dim)">29<br>R3</div>'
     + '</div>';
 
   var currentDiv = 0;
