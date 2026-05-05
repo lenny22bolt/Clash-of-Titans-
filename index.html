@@ -531,12 +531,23 @@ var S1 = {
 
 // 2026 Draft Order — confirmed from Sleeper draft board
 // Slots 13/14/15/16 have traded picks (see KNOWN_TRADES)
-var DRAFT_ORDER = [
+// Separate draft orders for each season
+var DRAFT_ORDER_2025 = [
+  "Son of Rander","Peanutzm3","Heir of Zeus","Poseidon's Fish",
+  "Orion Leaf","Fenrir's Fury","Warrior Shohei Goatani","ChatG-TDs",
+  "Beercules the Destroyer","Talon","Notchotaur","IceMonkey",
+  "Wrath of Moctezuma","Lord of Dreams","Hermes Hail Marys","Dewie Slayer of Bakunawa"
+];
+
+var DRAFT_ORDER_2026 = [
   "Orion Leaf","Beercules the Destroyer","Heir of Zeus","Talon",
   "Stefanos the Spartan King","Son of Rander","Wrath of Moctezuma","Warrior Shohei Goatani",
   "Fenrir's Fury","Lord Jefita Clapper","Dewie Slayer of Bakunawa","Notchotaur",
   "Hermes Hail Marys","Lord of Dreams","ChatG-TDs","IceMonkey"
 ];
+
+// Default DRAFT_ORDER for backwards compatibility (2026 current season)
+var DRAFT_ORDER = DRAFT_ORDER_2026;
 
 // Known manual trades not yet in Sleeper API
 // Format: { season, round, origSlot (0-based index in DRAFT_ORDER), newOwner }
@@ -1831,6 +1842,9 @@ function renderLiveDraft() {
 
   wrap.innerHTML = '<p style="color:var(--gold);font-family:Cinzel,serif;font-size:12px;text-align:center;padding:2rem">Loading draft data...</p>';
 
+  // 2026 Rookie Draft ID (hardcoded as backup)
+  var DRAFT_ID_2026 = '1336008673788444672';
+  
   // Fetch drafts for the league, then find the 2026 rookie draft
   var BASE = 'https://api.sleeper.app/v1/';
   fetch(BASE + 'league/' + LID + '/drafts')
@@ -1847,7 +1861,7 @@ function renderLiveDraft() {
         // Fall back to the most recent draft (highest created timestamp)
         active = drafts.sort(function(a,b){ return (b.created||0)-(a.created||0); })[0];
       }
-      LIVE_DRAFT_ID = active ? active.draft_id : null;
+      LIVE_DRAFT_ID = active ? active.draft_id : DRAFT_ID_2026;
       if (!LIVE_DRAFT_ID) { renderLiveDraftBoard([], active); return; }
 
       fetch(BASE + 'draft/' + LIVE_DRAFT_ID + '/picks')
@@ -1887,6 +1901,22 @@ function renderLiveDraftBoard(picks, draftObj) {
         slots[idx].player  = playerName.trim() || 'Unknown';
         slots[idx].pos     = p.metadata ? (p.metadata.position || '') : '';
         slots[idx].nflTeam = p.metadata ? (p.metadata.team || '') : '';
+        
+        // Get correct team name from owner_id (this is who actually made the pick)
+        if (p.owner_id) {
+          var ownerRoster = getRoster(p.owner_id);
+          if (ownerRoster) {
+            var ownerUser = getUser(ownerRoster.owner_id);
+            var correctTeam = tname(ownerRoster, ownerUser);
+            if (correctTeam && correctTeam !== 'Unknown') {
+              slots[idx].currentOwner = correctTeam;
+            } else {
+              // Fallback: if tname fails, try to find by matching roster info
+              console.warn('Failed to resolve team for owner_id ' + p.owner_id + ' at pick ' + (idx+1));
+            }
+          }
+        }
+        
         completedSet[idx] = true;
       }
     });
@@ -1913,8 +1943,12 @@ function renderLiveDraftBoard(picks, draftObj) {
 
   var html = '';
 
-  // Header bar
-  html += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:1.2rem">';
+  // Year selector buttons
+  html += '<div style="display:flex;gap:8px;margin-bottom:1.2rem;flex-wrap:wrap" id="draftYearTabs">';
+  html += '<button onclick="switchLiveDraftYear(\'2025\'); event.stopPropagation();" class="live-draft-year-btn" data-year="2025" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:8px 18px;border-radius:20px;cursor:pointer;border:1px solid var(--gold-border);background:transparent;color:var(--dim)">2025 Draft</button>';
+  html += '<button onclick="switchLiveDraftYear(\'2026\'); event.stopPropagation();" class="live-draft-year-btn" data-year="2026" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:8px 18px;border-radius:20px;cursor:pointer;border:1px solid var(--gold);background:var(--gold-dim);color:var(--gold)">2026 Draft</button>';
+  html += '</div>';
+  html += '<div id="liveDraftYearContent">';
   html += '<div>';
   html += '<div style="font-family:Cinzel,serif;font-size:15px;font-weight:700;color:var(--gold);margin-bottom:4px">2026 Rookie Draft &nbsp;&#183;&nbsp; May 1st @ 7:30 PM</div>';
   html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);letter-spacing:2px">' + picksCompleted + ' / ' + totalPicks + ' PICKS COMPLETE</div>';
@@ -2038,7 +2072,258 @@ function renderLiveDraftBoard(picks, draftObj) {
     html += '<div style="text-align:center;font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:2px;padding:8px 0">AUTO-REFRESHING EVERY 30 SECONDS</div>';
   }
 
+  html += '</div>'; // Close liveDraftYearContent
   wrap.innerHTML = html;
+  
+  // Highlight current year button
+  var yearBtns = document.querySelectorAll('.live-draft-year-btn');
+  yearBtns.forEach(function(btn) {
+    if (btn.dataset.year === '2026') {
+      btn.style.background = 'var(--gold-dim)';
+      btn.style.borderColor = 'var(--gold)';
+      btn.style.color = 'var(--gold)';
+    } else {
+      btn.style.background = 'transparent';
+      btn.style.borderColor = 'var(--gold-border)';
+      btn.style.color = 'var(--dim)';
+    }
+  });
+}
+
+// ── SWITCH LIVE DRAFT YEAR ────────────────────────────────────────
+function switchLiveDraftYear(year) {
+  console.log('Switching to ' + year + ' draft view');
+  // Update button styles
+  var yearBtns = document.querySelectorAll('.live-draft-year-btn');
+  yearBtns.forEach(function(btn) {
+    if (btn.dataset.year === year) {
+      btn.style.background = 'var(--gold-dim)';
+      btn.style.borderColor = 'var(--gold)';
+      btn.style.color = 'var(--gold)';
+    } else {
+      btn.style.background = 'transparent';
+      btn.style.borderColor = 'var(--gold-border)';
+      btn.style.color = 'var(--dim)';
+    }
+  });
+  
+  if (year === '2025') {
+    fetch2025DraftData();
+  } else if (year === '2026') {
+    renderLiveDraft();
+  }
+}
+
+// ── PREVENT ACCIDENTAL TAB SWITCH DURING SCROLL ────────────────────
+document.addEventListener('wheel', function(e) {
+  var draftYearTabs = document.getElementById('draftYearTabs');
+  var liveDraftContent = document.getElementById('liveDraftYearContent');
+  
+  // Don't switch tabs while scrolling in draft content
+  if (liveDraftContent && liveDraftContent.contains(e.target)) {
+    e.preventDefault();
+    return false;
+  }
+}, { passive: false });
+
+// ── FETCH 2025 DRAFT FROM SLEEPER API ────────────────────────────
+function fetch2025DraftData() {
+  var content = document.getElementById('liveDraftYearContent');
+  if (!content) return;
+  
+  content.innerHTML = '<div style="text-align:center;color:var(--dim);padding:2rem;font-family:Cinzel,serif;font-size:12px">Loading 2025 draft data...</div>';
+  
+  // Use the specific 2025 startup draft ID
+  var draftId = '1182479289256296448';
+  
+  // Fetch draft picks for this draft
+  safeFetch('/draft/' + draftId + '/picks')
+    .then(function(picks) {
+      if (!picks || picks.length === 0) {
+        content.innerHTML = '<div style="text-align:center;color:var(--dim);padding:2rem;font-family:Cinzel,serif;font-size:12px">2025 draft has not been drafted yet.</div>';
+        return;
+      }
+      
+      console.log('Fetched ' + picks.length + ' picks from 2025 draft');
+      
+      // Render 2025 draft board with picks
+      render2025DraftBoard(picks);
+    })
+    .catch(function(err) {
+      console.error('Error fetching 2025 draft:', err);
+      content.innerHTML = '<div style="text-align:center;color:var(--red);padding:2rem;font-family:Cinzel,serif;font-size:12px">Error loading 2025 draft data. Check console.</div>';
+    });
+}
+
+// ── RENDER 2025 DRAFT BOARD ───────────────────────────────────────
+function render2025DraftBoard(picks) {
+  var content = document.getElementById('liveDraftYearContent');
+  if (!content) return;
+  
+  // Build pick slots with SNAKE DRAFT for 2025 startup (round 1: 1-16, round 2: 16-1, etc)
+  var slots = [];
+  var roundCount = 14; // 2025 was a starter draft with 14 rounds
+  
+  for (var r = 1; r <= roundCount; r++) {
+    // Snake draft: odd rounds go 1-16, even rounds go 16-1
+    var isReverse = (r % 2 === 0);
+    
+    if (isReverse) {
+      // Even rounds: 16 down to 1
+      for (var i = 15; i >= 0; i--) {
+        var team = DRAFT_ORDER_2025[i];
+        slots.push({
+          pickNo: slots.length + 1,
+          round: r,
+          slot: i,
+          currentOwner: team,
+          originalOwner: team,
+          isTrade: false,
+          player: null,
+          pos: null,
+          nflTeam: null
+        });
+      }
+    } else {
+      // Odd rounds: 1 to 16
+      for (var i = 0; i < 16; i++) {
+        var team = DRAFT_ORDER_2025[i];
+        slots.push({
+          pickNo: slots.length + 1,
+          round: r,
+          slot: i,
+          currentOwner: team,
+          originalOwner: team,
+          isTrade: false,
+          player: null,
+          pos: null,
+          nflTeam: null
+        });
+      }
+    }
+  }
+  
+  var totalPicks = slots.length;
+  
+  // Map picks onto slots by pick_no
+  var completedSet = {};
+  if (picks && picks.length) {
+    picks.forEach(function(p) {
+      var idx = (p.pick_no || 1) - 1;
+      if (idx >= 0 && idx < slots.length) {
+        var playerName = p.metadata ? (p.metadata.first_name || '') + ' ' + (p.metadata.last_name || '') : 'Unknown';
+        slots[idx].player  = playerName.trim() || 'Unknown';
+        slots[idx].pos     = p.metadata ? (p.metadata.position || '') : '';
+        slots[idx].nflTeam = p.metadata ? (p.metadata.team || '') : '';
+        
+        // Get correct team name from owner_id
+        if (p.owner_id) {
+          var ownerRoster = getRoster(p.owner_id);
+          if (ownerRoster) {
+            var ownerUser = getUser(ownerRoster.owner_id);
+            var correctTeam = tname(ownerRoster, ownerUser);
+            if (correctTeam && correctTeam !== 'Unknown') {
+              slots[idx].currentOwner = correctTeam;
+            }
+          }
+        }
+        
+        completedSet[idx] = true;
+      }
+    });
+  }
+  
+  var picksCompleted = picks ? picks.length : 0;
+  var html = '';
+  
+  // Header
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:1.2rem">';
+  html += '<div>';
+  html += '<div style="font-family:Cinzel,serif;font-size:15px;font-weight:700;color:var(--gold);margin-bottom:4px">2025 Starter Draft</div>';
+  html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);letter-spacing:2px">' + picksCompleted + ' / ' + totalPicks + ' PICKS COMPLETE</div>';
+  html += '</div>';
+  
+  var status = picksCompleted >= totalPicks ? 'DRAFT COMPLETE' : 'IN PROGRESS';
+  var statusColor = picksCompleted >= totalPicks ? '#6EDE7E' : 'var(--gold)';
+  var statusBg = picksCompleted >= totalPicks ? '#6EDE7E' : 'rgba(201,168,76,0.2)';
+  html += '<span style="background:' + statusBg + ';color:' + statusColor + ';font-family:Cinzel,serif;font-size:10px;letter-spacing:2px;padding:4px 12px;border-radius:20px;font-weight:700;border:1px solid ' + statusColor + '">' + status + '</span>';
+  html += '</div>';
+  
+  // Legend
+  html += '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:1rem;font-family:Cinzel,serif;font-size:10px;letter-spacing:1px">';
+  html += '<span style="color:var(--dim)">&#9632; Own pick</span>';
+  html += '<span style="color:#FFB347">&#9632; Traded pick</span>';
+  html += '<span style="color:#6EDE7E">&#9632; Completed</span>';
+  html += '</div>';
+  
+  // Rounds
+  for (var r = 1; r <= roundCount; r++) {
+    html += '<div style="margin-bottom:1.6rem">';
+    var roundLabel = r % 2 === 0 ? 'ROUND ' + r + ' (16→1)' : 'ROUND ' + r + ' (1→16)';
+    html += '<div style="font-family:Cinzel,serif;font-size:11px;letter-spacing:3px;color:var(--gold);padding:8px 0 6px;border-bottom:1px solid var(--gold-border);margin-bottom:10px">' + roundLabel + '</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px">';
+    
+    for (var s2 = 0; s2 < slots.length; s2++) {
+      var sl = slots[s2];
+      if (sl.round !== r) continue;
+      
+      var isCompleted = !!completedSet[s2];
+      
+      var cardBg, cardBorder, labelColor;
+      if (isCompleted) {
+        cardBg = 'rgba(110,222,126,0.07)';
+        cardBorder = 'rgba(110,222,126,0.3)';
+        labelColor = '#6EDE7E';
+      } else if (sl.isTrade) {
+        cardBg = 'rgba(255,179,71,0.07)';
+        cardBorder = 'rgba(255,179,71,0.4)';
+        labelColor = '#FFB347';
+      } else {
+        cardBg = 'rgba(201,168,76,0.03)';
+        cardBorder = 'var(--gold-border)';
+        labelColor = 'var(--gold)';
+      }
+      
+      var pickNum = s2 + 1;
+      var pickStr = r + '.' + ('0' + (pickNum % 16 || 16)).slice(-2);
+      
+      html += '<div style="background:' + cardBg + ';border:1px solid ' + cardBorder + ';border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px">';
+      html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:' + labelColor + '">' + pickStr + '</div>';
+      
+      if (isCompleted && sl.player) {
+        // Show completed pick with player
+        html += '<div style="display:flex;align-items:center;gap:8px">';
+        html += '<img src="' + getCrestForTeam(sl.currentOwner) + '" style="width:28px;height:28px;object-fit:contain;border-radius:4px;flex-shrink:0" onerror="this.style.display=\'none\'">';
+        html += '<div style="min-width:0">';
+        html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:#fff;line-height:1.2;word-wrap:break-word">' + sl.player + '</div>';
+        html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim)">' + sl.currentOwner + '</div>';
+        html += '</div></div>';
+        
+        if (sl.pos || sl.nflTeam) {
+          html += '<div style="display:flex;gap:4px;flex-wrap:wrap">';
+          if (sl.pos) html += '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;color:#000;background:' + posColor(sl.pos) + ';padding:2px 7px;border-radius:6px">' + sl.pos + '</span>';
+          if (sl.nflTeam) html += '<span style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);padding:2px 4px">' + sl.nflTeam + '</span>';
+          html += '</div>';
+        }
+      } else {
+        // Show empty slot
+        html += '<div style="display:flex;align-items:center;gap:8px">';
+        html += '<img src="' + getCrestForTeam(sl.currentOwner) + '" style="width:28px;height:28px;object-fit:contain;border-radius:4px;opacity:0.55;flex-shrink:0" onerror="this.style.display=\'none\'">';
+        html += '<div>';
+        html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim)">' + sl.currentOwner + '</div>';
+        if (sl.isTrade) {
+          html += '<div style="font-family:Cinzel,serif;font-size:8px;color:rgba(255,179,71,0.7)">from ' + sl.originalOwner + '</div>';
+        }
+        html += '</div></div>';
+      }
+      
+      html += '</div>';
+    }
+    
+    html += '</div></div>';
+  }
+  
+  content.innerHTML = html;
 }
 // ── END LIVE DRAFT BOARD ──────────────────────────────────────────────────────
 
