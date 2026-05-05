@@ -308,7 +308,6 @@ document.addEventListener('DOMContentLoaded', function() {
   <button class="nb" id="draft2027NavBtn" style="display:none" onclick="showTab('draft2027',this)">2027 Draft</button>
   <button class="nb" id="liveDraftNavBtn" onclick="showTab('livedraft',this)">&#127944; Live Draft</button>
   <button class="nb"     onclick="showTab('treasury',this)">🏛 Treasury</button>
-  <button class="nb"     onclick="showTab('fallen',this)">Fallen</button>
   <button class="nb"     onclick="showTab('quests',this)">🗡 Quests</button>
   <button class="nb"     onclick="showTab('power',this)">👑 Power Rankings</button>
   <button class="nb"     onclick="showTab('sidepots',this)">💰 Side Pots</button>
@@ -1687,6 +1686,35 @@ function renderHistory() {
       + '</div>';
   });
   html += '</div>';
+  
+  // ── THE FALLEN WARRIORS ────────────────────────────────────────
+  html += '<div style="background:linear-gradient(135deg,#1A0A0A,#2A1515);border:1px solid rgba(255,107,107,.2);border-radius:14px;padding:1.5rem;text-align:center;margin-top:2rem;margin-bottom:1.5rem">'
+    + '<div style="font-family:Cinzel Decorative,serif;font-size:16px;color:var(--red);letter-spacing:2px;margin-bottom:.5rem">⚔ THE FALLEN WARRIORS ⚔</div>'
+    + '<div style="font-size:13px;color:var(--dim);font-family:Cinzel,serif;letter-spacing:1px;font-style:italic">Those who answered the call, competed with honor, and departed the realm.</div>'
+    + '</div>';
+
+  html += '<div class="fallen-card">'
+    + '<div class="fallen-card-header"><div style="font-size:36px">🔱</div><div>'
+    + '<div class="fallen-name-title">PoseidonsFish</div>'
+    + '<div style="font-size:11px;color:var(--dim);font-family:Cinzel,serif;letter-spacing:1px">Season 1 (2024-2025) · Celestial South</div>'
+    + '</div><div style="margin-left:auto"><span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:4px 12px;border-radius:12px;background:rgba(255,107,107,.12);color:var(--red);border:1px solid rgba(255,107,107,.25)">DEPARTED</span></div></div>'
+    + '<div style="padding:14px 18px;font-size:14px;color:var(--dim);font-family:EB Garamond,serif;line-height:1.8;font-style:italic">"PoseidonsFish rose from the depths of the Celestial South with the hunger of a sea god. An 8-6 record and 1,352 points proved this titan was no mere mortal — yet the tides turned, and they departed the realm after Season 1. Their trident now rests at the bottom of the Celestial Sea."</div>'
+    + '<div style="display:flex;gap:1rem;padding:12px 18px;border-top:1px solid rgba(255,107,107,.1);flex-wrap:wrap">'
+    + '<div style="text-align:center"><div style="font-family:Cinzel,serif;font-size:18px;font-weight:700;color:var(--red)">8-6</div><div style="font-size:10px;color:var(--dim);font-family:Cinzel,serif;text-transform:uppercase;letter-spacing:1px">S1 Record</div></div>'
+    + '<div style="text-align:center"><div style="font-family:Cinzel,serif;font-size:18px;font-weight:700;color:var(--red)">1352</div><div style="font-size:10px;color:var(--dim);font-family:Cinzel,serif;text-transform:uppercase;letter-spacing:1px">Points For</div></div>'
+    + '<div style="text-align:center"><div style="font-family:Cinzel,serif;font-size:18px;font-weight:700;color:var(--red)">$90</div><div style="font-size:10px;color:var(--dim);font-family:Cinzel,serif;text-transform:uppercase;letter-spacing:1px">FAAB Left</div></div>'
+    + '<div style="text-align:center"><div style="font-family:Cinzel,serif;font-size:18px;font-weight:700;color:var(--red)">1</div><div style="font-size:10px;color:var(--dim);font-family:Cinzel,serif;text-transform:uppercase;letter-spacing:1px">Seasons</div></div>'
+    + '</div></div>';
+
+  html += '<div style="background:var(--navy-card);border-radius:12px;border:1px solid var(--gold-border);padding:1.2rem 1.5rem;margin-top:1rem;text-align:center">'
+    + '<div style="font-family:Cinzel,serif;font-size:11px;letter-spacing:2px;color:var(--gold);margin-bottom:6px">REPLACED BY</div>'
+    + '<div style="display:flex;align-items:center;justify-content:center;gap:12px">'
+    + '<span style="font-size:28px">🪖</span>'
+    + '<div><div style="font-family:Cinzel,serif;font-size:14px;font-weight:700;color:var(--text)">Stefanos the Spartan King</div>'
+    + '<div style="font-size:12px;color:var(--dim);font-family:Cinzel,serif">Celestial South · Inaugural Season 2026</div></div>'
+    + '<span style="font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(110,222,126,.12);color:var(--green);border:1px solid rgba(110,222,126,.25)">NEW TITAN</span>'
+    + '</div></div>';
+  
   wrap.innerHTML = html;
 }
 
