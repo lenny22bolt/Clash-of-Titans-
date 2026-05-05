@@ -546,12 +546,17 @@ var DRAFT_ORDER_2026 = [
   "Hermes Hail Marys","Lord of Dreams","ChatG-TDs","IceMonkey"
 ];
 
-// Default DRAFT_ORDER for backwards compatibility (2026 current season)
-var DRAFT_ORDER = DRAFT_ORDER_2026;
-
 // Known manual trades not yet in Sleeper API
 // Format: { season, round, origSlot (0-based index in DRAFT_ORDER), newOwner }
 // Confirmed trades from Sleeper draft board screenshot + earlier confirmations
+var KNOWN_TRADES = [
+  // 2026: Lord of Dreams owns picks 1.14, 2.14, 3.14 (Sleeper shows differently in API but website is correct)
+  { season: 2026, round: 1, origSlot: 13, newOwner: "Lord of Dreams" },
+  { season: 2026, round: 3, origSlot: 13, newOwner: "Lord of Dreams" }
+];
+
+// Default DRAFT_ORDER for backwards compatibility (2026 current season)
+var DRAFT_ORDER = DRAFT_ORDER_2026;
 
 var HARDCODED_PICKS = {
   "IceMonkey": {
@@ -650,7 +655,6 @@ var KNOWN_TRADES = [
   // Round 1 trades (from Sleeper board)
   { season:'2026', round:1, origSlot:7,  newOwner:'Orion Leaf',        note:'From Warrior Shohei Goatani' },
   { season:'2026', round:1, origSlot:12, newOwner:'Heir of Zeus',       note:'From Hermes Hail Marys' },
-  { season:'2026', round:1, origSlot:13, newOwner:'Talon',              note:'From Lord of Dreams' },
   { season:'2026', round:1, origSlot:14, newOwner:'Talon',              note:'From ChatG-TDs' },
   { season:'2026', round:1, origSlot:15, newOwner:'Orion Leaf',         note:'From IceMonkey' },
   // Round 2 trades (from Sleeper board)
@@ -662,7 +666,6 @@ var KNOWN_TRADES = [
   // Round 3 trades (from Sleeper board)
   { season:'2026', round:3, origSlot:0,  newOwner:'ChatG-TDs',          note:'From Orion Leaf' },
   { season:'2026', round:3, origSlot:12, newOwner:'Orion Leaf',         note:'From Hermes' },
-  { season:'2026', round:3, origSlot:13, newOwner:'Talon',              note:'From Lord of Dreams' },
 ];
 
 var MOCK_USERS = [
@@ -1911,9 +1914,10 @@ function renderLiveDraftBoard(picks, draftObj) {
             if (correctTeam && correctTeam !== 'Unknown') {
               slots[idx].currentOwner = correctTeam;
             } else {
-              // Fallback: if tname fails, try to find by matching roster info
-              console.warn('Failed to resolve team for owner_id ' + p.owner_id + ' at pick ' + (idx+1));
+              console.log('Could not resolve team for owner_id ' + p.owner_id + ' pick ' + p.pick_no);
             }
+          } else {
+            console.log('Could not find roster for owner_id ' + p.owner_id + ' pick ' + p.pick_no);
           }
         }
         
