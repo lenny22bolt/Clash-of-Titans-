@@ -1843,7 +1843,20 @@ function renderLiveDraft() {
   // Stop any existing polling
   if (LIVE_DRAFT_TIMER) { clearInterval(LIVE_DRAFT_TIMER); LIVE_DRAFT_TIMER = null; }
 
-  wrap.innerHTML = '<p style="color:var(--gold);font-family:Cinzel,serif;font-size:12px;text-align:center;padding:2rem">Loading draft data...</p>';
+  // Check if year tabs already exist - if not, build them
+  if (!document.getElementById('draftYearTabs')) {
+    var initialHtml = '<div style="display:flex;gap:8px;margin-bottom:1.2rem;flex-wrap:wrap" id="draftYearTabs">';
+    initialHtml += '<button onclick="switchLiveDraftYear(\'2025\'); event.stopPropagation();" class="live-draft-year-btn" data-year="2025" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:8px 18px;border-radius:20px;cursor:pointer;border:1px solid var(--gold-border);background:transparent;color:var(--dim)">2025 Draft</button>';
+    initialHtml += '<button onclick="switchLiveDraftYear(\'2026\'); event.stopPropagation();" class="live-draft-year-btn" data-year="2026" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:8px 18px;border-radius:20px;cursor:pointer;border:1px solid var(--gold);background:var(--gold-dim);color:var(--gold)">2026 Draft</button>';
+    initialHtml += '<button onclick="switchLiveDraftYear(\'2027\'); event.stopPropagation();" class="live-draft-year-btn" data-year="2027" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:8px 18px;border-radius:20px;cursor:pointer;border:1px solid var(--gold-border);background:transparent;color:var(--dim)">2027 Draft</button>';
+    initialHtml += '</div><div id="liveDraftYearContent"></div>';
+    wrap.innerHTML = initialHtml;
+  }
+  
+  var contentDiv = document.getElementById('liveDraftYearContent');
+  if (contentDiv) {
+    contentDiv.innerHTML = '<p style="color:var(--gold);font-family:Cinzel,serif;font-size:12px;text-align:center;padding:2rem">Loading draft data...</p>';
+  }
 
   // 2026 Rookie Draft ID (hardcoded as backup)
   var DRAFT_ID_2026 = '1336008673788444672';
@@ -1947,12 +1960,7 @@ function renderLiveDraftBoard(picks, draftObj) {
 
   var html = '';
 
-  // Year selector buttons
-  html += '<div style="display:flex;gap:8px;margin-bottom:1.2rem;flex-wrap:wrap" id="draftYearTabs">';
-  html += '<button onclick="switchLiveDraftYear(\'2025\'); event.stopPropagation();" class="live-draft-year-btn" data-year="2025" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:8px 18px;border-radius:20px;cursor:pointer;border:1px solid var(--gold-border);background:transparent;color:var(--dim)">2025 Draft</button>';
-  html += '<button onclick="switchLiveDraftYear(\'2026\'); event.stopPropagation();" class="live-draft-year-btn" data-year="2026" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:8px 18px;border-radius:20px;cursor:pointer;border:1px solid var(--gold);background:var(--gold-dim);color:var(--gold)">2026 Draft</button>';
-  html += '</div>';
-  html += '<div id="liveDraftYearContent">';
+  // Start with just the content (year buttons are built once in renderLiveDraft)
   html += '<div>';
   html += '<div style="font-family:Cinzel,serif;font-size:15px;font-weight:700;color:var(--gold);margin-bottom:4px">2026 Rookie Draft &nbsp;&#183;&nbsp; May 1st @ 7:30 PM</div>';
   html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);letter-spacing:2px">' + picksCompleted + ' / ' + totalPicks + ' PICKS COMPLETE</div>';
@@ -2077,7 +2085,11 @@ function renderLiveDraftBoard(picks, draftObj) {
   }
 
   html += '</div>'; // Close liveDraftYearContent
-  wrap.innerHTML = html;
+  
+  var contentDiv = document.getElementById('liveDraftYearContent');
+  if (contentDiv) {
+    contentDiv.innerHTML = html;
+  }
   
   // Highlight current year button
   var yearBtns = document.querySelectorAll('.live-draft-year-btn');
@@ -2097,6 +2109,7 @@ function renderLiveDraftBoard(picks, draftObj) {
 // ── SWITCH LIVE DRAFT YEAR ────────────────────────────────────────
 function switchLiveDraftYear(year) {
   console.log('Switching to ' + year + ' draft view');
+  
   // Update button styles
   var yearBtns = document.querySelectorAll('.live-draft-year-btn');
   yearBtns.forEach(function(btn) {
@@ -2111,24 +2124,60 @@ function switchLiveDraftYear(year) {
     }
   });
   
+  // Clear any pending timers to prevent interference
+  if (LIVE_DRAFT_TIMER) {
+    clearInterval(LIVE_DRAFT_TIMER);
+    LIVE_DRAFT_TIMER = null;
+  }
+  
   if (year === '2025') {
     fetch2025DraftData();
   } else if (year === '2026') {
     renderLiveDraft();
+  } else if (year === '2027') {
+    render2027DraftBoard();
   }
 }
 
-// ── PREVENT ACCIDENTAL TAB SWITCH DURING SCROLL ────────────────────
-document.addEventListener('wheel', function(e) {
-  var draftYearTabs = document.getElementById('draftYearTabs');
-  var liveDraftContent = document.getElementById('liveDraftYearContent');
+// ── RENDER 2027 DRAFT BOARD (COMPLETELY BLANK) ────────────────────
+function render2027DraftBoard() {
+  var content = document.getElementById('liveDraftYearContent');
+  if (!content) return;
   
-  // Don't switch tabs while scrolling in draft content
-  if (liveDraftContent && liveDraftContent.contains(e.target)) {
-    e.preventDefault();
-    return false;
+  var html = '';
+  
+  // Header
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:1.2rem">';
+  html += '<div>';
+  html += '<div style="font-family:Cinzel,serif;font-size:15px;font-weight:700;color:var(--gold);margin-bottom:4px">2027 Rookie Draft</div>';
+  html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);letter-spacing:2px">0 / 48 PICKS COMPLETE</div>';
+  html += '</div>';
+  html += '<span style="background:rgba(201,168,76,0.2);color:var(--gold);font-family:Cinzel,serif;font-size:10px;letter-spacing:2px;padding:4px 12px;border-radius:20px;font-weight:700;border:1px solid var(--gold-border)">COMING SOON</span>';
+  html += '</div>';
+  
+  // Rounds - completely blank slots
+  var pickNum = 1;
+  for (var r = 1; r <= 3; r++) {
+    html += '<div style="margin-bottom:1.6rem">';
+    html += '<div style="font-family:Cinzel,serif;font-size:11px;letter-spacing:3px;color:var(--gold);padding:8px 0 6px;border-bottom:1px solid var(--gold-border);margin-bottom:10px">ROUND ' + r + '</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px">';
+    
+    for (var slot = 1; slot <= 16; slot++) {
+      var pickStr = r + '.' + ('0' + slot).slice(-2);
+      
+      html += '<div style="background:rgba(201,168,76,0.03);border:1px dashed var(--gold-border);border-radius:10px;padding:12px;display:flex;align-items:center;justify-content:center;min-height:80px">';
+      html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:var(--gold);opacity:0.6">' + pickStr + '</div>';
+      html += '</div>';
+      
+      pickNum++;
+    }
+    
+    html += '</div></div>';
   }
-}, { passive: false });
+  
+  content.innerHTML = html;
+}
+// Scroll on draft content is allowed - buttons have event.stopPropagation()
 
 // ── FETCH 2025 DRAFT FROM SLEEPER API ────────────────────────────
 function fetch2025DraftData() {
