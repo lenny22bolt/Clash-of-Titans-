@@ -1303,13 +1303,22 @@ function viewRoster(rosterId, switchTab) {
 function renderMatchups(matchups, week) {
   var wrap = document.getElementById('mwrap');
   if (!matchups || !matchups.length) { wrap.innerHTML = noData('No matchup data for Week '+week+' yet.'); return; }
+  
+  // Division weeks for 2026 season
+  var divisionWeeks = [2, 5, 8, 12, 13, 14];
+  var gauntletWeeks = [12, 13, 14];
+  var isDivWeek = divisionWeeks.includes(week);
+  var isGauntletWeek = gauntletWeeks.includes(week);
+  
   var games = {};
   matchups.forEach(function(m){ if(!games[m.matchup_id]) games[m.matchup_id]=[]; games[m.matchup_id].push(m); });
+  
   var html = '<div class="week-nav">'
     + '<button class="wnbtn" onclick="loadWeek('+(week-1)+')">◀ Prev</button>'
-    + '<div class="wlbl">Week '+week+'</div>'
+    + '<div class="wlbl"' + (isDivWeek ? ' style="color:#FFD700;font-weight:900;text-shadow:0 0 10px #FFD700;letter-spacing:2px"' : '') + '>Week '+week + (isDivWeek ? ' ⚔ DIVISION' : '') + '</div>'
     + '<button class="wnbtn" onclick="loadWeek('+(week+1)+')">Next ▶</button>'
-    + '</div><div class="mg">';
+    + '</div><div class="mg"' + (isDivWeek ? ' style="border:3px solid #FFD700;border-radius:12px;padding:10px;background:linear-gradient(135deg,rgba(255,215,0,0.1),rgba(255,100,0,0.05))"' : '') + '>';
+  
   Object.keys(games).forEach(function(id) {
     var pair = games[id];
     if (pair.length < 2) return;
@@ -1318,13 +1327,25 @@ function renderMatchups(matchups, week) {
     var ua = getUser(ra.owner_id),   ub = getUser(rb.owner_id);
     var sa = (a.points||0).toFixed(2), sb = (b.points||0).toFixed(2);
     var aW = parseFloat(sa)>parseFloat(sb), bW = parseFloat(sb)>parseFloat(sa);
-    html += '<div class="mcard"><div class="mteams">'
+    var cardStyle = isDivWeek ? 'border:2px solid #FFD700;box-shadow:0 0 15px rgba(255,215,0,0.4)' : '';
+    html += '<div class="mcard"' + (cardStyle ? ' style="' + cardStyle + '"' : '') + '><div class="mteams">'
       + '<div class="mteam"><div class="mtn">'+tname(ra,ua)+'</div><div class="mmgr">'+(ua.display_name||'')+'</div><div class="mscore'+(aW?' win':'')+'">'+sa+'</div></div>'
       + '<div class="mvs">VS</div>'
       + '<div class="mteam right"><div class="mtn">'+tname(rb,ub)+'</div><div class="mmgr">'+(ub.display_name||'')+'</div><div class="mscore'+(bW?' win':'')+'">'+sb+'</div></div>'
       + '</div></div>';
   });
-  wrap.innerHTML = html + '</div>';
+  html += '</div>';
+  
+  // Add Division Gauntlet section for weeks 12-14
+  if (isGauntletWeek) {
+    html += '<div style="margin-top:2rem;padding:1.5rem;background:linear-gradient(135deg,rgba(255,100,0,0.15),rgba(255,215,0,0.1));border:2px dashed #FF6400;border-radius:12px;text-align:center">';
+    html += '<div style="font-family:Cinzel,serif;font-size:16px;font-weight:900;color:#FF6400;letter-spacing:3px;margin-bottom:0.5rem;text-transform:uppercase">⚔ DIVISION GAUNTLET ⚔</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:11px;color:var(--dim);letter-spacing:1px;margin-bottom:0.5rem">WEEKS 12 • 13 • 14 — THE FINAL BATTLE</div>';
+    html += '<div style="font-family:Cinzel,serif;font-size:10px;color:#FF6400;font-style:italic">All division matchups in the championship stretch. May the best team emerge victorious.</div>';
+    html += '</div>';
+  }
+  
+  wrap.innerHTML = html;
 }
 
 function loadWeek(week) {
@@ -5089,8 +5110,16 @@ Promise.all([
       renderTransactions();
     });
 
-    // Load matchups
-    safeFetch('/league/'+LID+'/matchups/'+S.week).then(function(mu){ if(mu&&mu.length) renderMatchups(mu, S.week); });
+    // Load matchups - start with week 1
+    safeFetch('/league/'+LID+'/matchups/1').then(function(mu){ 
+      if(mu&&mu.length) {
+        renderMatchups(mu, 1);
+        // Pre-load all weeks in background for smooth browsing
+        for (var w = 2; w <= 14; w++) {
+          safeFetch('/league/'+LID+'/matchups/'+w);
+        }
+      }
+    });
 
     // Load player DB in background
     document.getElementById('stb').textContent = st;
