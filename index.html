@@ -7561,17 +7561,17 @@ function renderProfiles() {
   wrap.innerHTML = html;
 }
 
-// ── PROP BETTING RENDERER ──────────────────────────────────────────────────────
+// ── PROP BETTING RENDERER (IMPROVED UI) ──────────────────────────────
 function renderPropBetting(me) {
   var html = '';
   
   // Add new prop button for commissioner
   if (me && me.name === 'Heir of Zeus') {
-    html += '<button onclick="openCreatePropPanel()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:14px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer;margin-bottom:24px">+ CREATE NEW PROP BET</button>';
+    html += '<button onclick="openCreatePropPanel()" style="font-family:Cinzel,serif;font-size:11px;font-weight:700;letter-spacing:1px;padding:12px 24px;border-radius:10px;border:2px solid var(--gold);background:rgba(201,168,76,.15);color:var(--gold);cursor:pointer;margin-bottom:30px;transition:all .2s;hover:box-shadow:0 0 20px rgba(201,168,76,.3)">+ CREATE NEW PROP BET</button>';
   }
   
   if (PROP_BETS.length === 0) {
-    html += '<div style="text-align:center;padding:40px;color:var(--dim)">No prop bets yet. Create your first one!</div>';
+    html += '<div style="text-align:center;padding:60px 40px;color:var(--dim);font-family:EB Garamond,serif;font-size:14px">No prop bets yet. Create your first one to get started!</div>';
     return html;
   }
   
@@ -7579,95 +7579,104 @@ function renderPropBetting(me) {
   var activeProps = PROP_BETS.filter(p => p.status === 'active');
   if (activeProps.length > 0) {
     html += '<div style="margin-bottom:40px">';
-    html += '<h3 style="font-family:Cinzel,serif;font-size:14px;color:var(--gold);margin-bottom:16px;letter-spacing:1px">ACTIVE PROPS</h3>';
     
     activeProps.forEach(function(prop) {
       var stats = getPropStats(prop.id);
-      html += '<div style="background:linear-gradient(135deg,rgba(10,22,40,0.8),rgba(19,32,64,0.8));border:1px solid var(--gold-border);border-radius:14px;padding:16px;margin-bottom:16px">';
+      var paymentPercent = stats.paidPercent;
+      var paymentColor = paymentPercent === 100 ? '#6EDE7E' : paymentPercent >= 50 ? '#FFB347' : '#FF6B6B';
       
-      // Prop header
-      html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">';
+      html += '<div style="background:linear-gradient(135deg,rgba(10,22,40,0.9),rgba(19,32,64,0.9));border:2px solid rgba(201,168,76,.3);border-radius:16px;padding:24px;margin-bottom:20px;box-shadow:0 8px 24px rgba(0,0,0,.4);transition:all .3s">';
+      
+      // Header
+      html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">';
       html += '<div>';
-      html += '<div style="font-family:Cinzel,serif;font-size:14px;font-weight:700;color:var(--gold)">'+prop.title+'</div>';
-      html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);margin-top:4px">Type: '+prop.type+' · '+prop.teams.length+' teams</div>';
+      html += '<div style="font-family:Cinzel,serif;font-size:16px;font-weight:700;color:var(--gold);letter-spacing:1px">'+prop.title+'</div>';
+      html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--dim);margin-top:6px;letter-spacing:.5px">Type: <span style="color:rgba(201,168,76,.8)">'+prop.type.toUpperCase()+'</span> · <span style="color:rgba(255,255,255,.6)">'+prop.teams.length+' teams</span></div>';
       html += '</div>';
       html += '<div style="text-align:right">';
-      html += '<div style="font-family:Cinzel,serif;font-size:12px;color:#FFD580">$'+stats.totalWagered.toFixed(2)+'</div>';
+      html += '<div style="font-family:Cinzel,serif;font-size:18px;font-weight:700;color:#FFD580">$'+stats.totalWagered.toFixed(2)+'</div>';
       html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);margin-top:2px">'+stats.totalBets+' bets</div>';
       html += '</div>';
       html += '</div>';
       
-      // Payment summary
-      html += '<div style="background:rgba(0,0,0,.3);border-radius:8px;padding:10px;margin-bottom:12px;font-family:Cinzel,serif;font-size:9px">';
-      html += '<div style="color:var(--text)">Payment Status: <span style="color:#6EDE7E">'+stats.paidCount+'/'+stats.totalBets+' paid</span> ('+stats.paidPercent+'%)</div>';
-      html += '<div style="color:var(--dim);margin-top:4px">Paid: $'+stats.totalPaid.toFixed(2)+' | Owed: $'+stats.totalOwed.toFixed(2)+'</div>';
+      // Payment Progress Bar
+      html += '<div style="background:rgba(0,0,0,.4);border-radius:10px;overflow:hidden;margin-bottom:14px;height:6px">';
+      html += '<div style="background:'+paymentColor+';height:100%;width:'+paymentPercent+'%;transition:width .3s"></div>';
       html += '</div>';
       
-      // Teams selector
-      html += '<div style="border-top:1px solid rgba(201,168,76,.2);padding-top:12px">';
-      html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);margin-bottom:8px">AVAILABLE TEAMS:</div>';
-      html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:12px">';
-      prop.teams.forEach(function(team, idx) {
-        var teamBets = prop.bets.filter(b => b.selectedTeams.includes(team));
-        html += '<div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.3);border-radius:8px;padding:8px;text-align:center;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor=\'var(--gold)\'" onmouseout="this.style.borderColor=\'rgba(201,168,76,.3)\'">';
-        html += '<div style="font-family:Cinzel,serif;font-size:9px;font-weight:700;color:var(--gold)">'+team+'</div>';
-        html += '<div style="font-family:Cinzel,serif;font-size:8px;color:var(--dim);margin-top:2px">'+teamBets.length+' bets</div>';
-        html += '</div>';
-      });
+      // Payment Summary
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding:12px;background:rgba(0,0,0,.3);border-radius:8px;border-left:3px solid '+paymentColor+'">';
+      html += '<div style="font-family:Cinzel,serif;font-size:10px;color:var(--text)">Payment: <span style="font-weight:700;color:'+paymentColor+'">'+stats.paidCount+'/'+stats.totalBets+' teams paid</span> ('+paymentPercent+'%)</div>';
+      html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim)">Paid: <span style="color:#6EDE7E">$'+stats.totalPaid.toFixed(2)+'</span> | Owed: <span style="color:#FF6B6B">$'+stats.totalOwed.toFixed(2)+'</span></div>';
       html += '</div>';
       
-      // Tabs for prop details
-      html += '<div style="display:flex;gap:8px;margin-bottom:12px;border-bottom:1px solid rgba(201,168,76,.2)">';
-      html += '<button onclick="switchPropTab(\''+prop.id+'-bets\',this)" class="propTabBtn on" style="font-family:Cinzel,serif;font-size:8px;font-weight:700;padding:6px 12px;border:none;background:transparent;color:var(--gold);cursor:pointer;border-bottom:2px solid var(--gold)">BETS</button>';
-      html += '<button onclick="switchPropTab(\''+prop.id+'-payments\',this)" class="propTabBtn" style="font-family:Cinzel,serif;font-size:8px;font-weight:700;padding:6px 12px;border:none;background:transparent;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent">PAYMENTS</button>';
+      // Tabs
+      html += '<div style="display:flex;gap:12px;margin-bottom:14px;border-bottom:1px solid rgba(201,168,76,.2);padding-bottom:10px">';
+      html += '<button onclick="switchPropTab(\''+prop.id+'-bets\',this)" class="propTabBtn on" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;padding:6px 14px;border:none;background:transparent;color:var(--gold);cursor:pointer;border-bottom:2px solid var(--gold)">🎯 BETS</button>';
+      html += '<button onclick="switchPropTab(\''+prop.id+'-payments\',this)" class="propTabBtn" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;padding:6px 14px;border:none;background:transparent;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent">💳 PAYMENTS</button>';
+      html += '<button onclick="switchPropTab(\''+prop.id+'-teams\',this)" class="propTabBtn" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;padding:6px 14px;border:none;background:transparent;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent">👥 TEAMS</button>';
       html += '</div>';
       
-      // Bets tab
+      // Bets Tab
       html += '<div id="propTab-'+prop.id+'-bets" class="propTabContent" style="margin-bottom:12px">';
       if (prop.bets.length === 0) {
-        html += '<div style="font-size:9px;color:var(--dim);text-align:center;padding:20px">No bets yet</div>';
+        html += '<div style="font-size:10px;color:var(--dim);text-align:center;padding:20px">No bets placed yet</div>';
       } else {
         prop.bets.forEach(function(bet, idx) {
           var statusIcon = bet.paymentStatus === 'paid' ? '✅' : '⭕';
-          html += '<div style="background:rgba(201,168,76,.05);border:1px solid rgba(201,168,76,.15);border-radius:8px;padding:8px;margin-bottom:8px">';
-          html += '<div style="display:flex;justify-content:space-between;align-items:center">';
-          html += '<div>';
-          html += '<div style="font-family:Cinzel,serif;font-size:9px;font-weight:700;color:var(--text)">'+bet.bettor+'</div>';
-          html += '<div style="font-size:8px;color:var(--dim);margin-top:2px">'+bet.selectedTeams.join(' vs ').replace(/ vs /g, ' vs ')+' | $'+bet.amount.toFixed(0)+'</div>';
+          var statusColor = bet.paymentStatus === 'paid' ? '#6EDE7E' : '#FFB347';
+          html += '<div style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.15);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">';
+          html += '<div style="flex:1">';
+          html += '<div style="font-family:Cinzel,serif;font-size:10px;font-weight:700;color:var(--text)">'+bet.bettor+'</div>';
+          html += '<div style="font-size:9px;color:var(--dim);margin-top:2px">'+bet.selectedTeams.join(' vs ')+'</div>';
           html += '</div>';
-          html += '<div style="font-size:10px">'+statusIcon+'</div>';
+          html += '<div style="text-align:right">';
+          html += '<div style="font-family:Cinzel,serif;font-size:11px;font-weight:700;color:var(--gold)">$'+bet.amount.toFixed(0)+'</div>';
+          html += '<div style="font-size:10px;color:'+statusColor+'">'+statusIcon+'</div>';
           html += '</div>';
           html += '</div>';
         });
       }
       html += '</div>';
       
-      // Payments tab (only for commissioner)
-      html += '<div id="propTab-'+prop.id+'-payments" class="propTabContent" style="display:none">';
+      // Payments Tab (Commissioner Only)
+      html += '<div id="propTab-'+prop.id+'-payments" class="propTabContent" style="display:none;margin-bottom:12px">';
       if (me && me.name === 'Heir of Zeus') {
-        html += '<div style="font-size:9px;color:var(--dim);margin-bottom:12px">Mark bets as paid:</div>';
+        html += '<div style="font-size:9px;color:var(--dim);margin-bottom:10px">Mark bets as paid:</div>';
         prop.bets.forEach(function(bet, idx) {
-          html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:8px;background:rgba(0,0,0,.2);border-radius:6px">';
-          html += '<input type="checkbox" id="bet-'+bet.id+'" onchange="markBetPaidUI(\''+prop.id+'\',\''+bet.id+'\',this.checked)" style="cursor:pointer" '+(bet.paymentStatus === 'paid' ? 'checked' : '')+'>';
-          html += '<label for="bet-'+bet.id+'" style="flex:1;font-size:9px;cursor:pointer">'+bet.bettor+' - $'+bet.amount.toFixed(0)+'</label>';
-          html += '<span style="font-size:9px;color:var(--dim)">'+( bet.paymentStatus === 'paid' ? '✅ PAID' : '⭕ UNPAID')+'</span>';
+          html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:10px;background:rgba(0,0,0,.2);border-radius:6px;border-left:2px solid '+(bet.paymentStatus === 'paid' ? '#6EDE7E' : '#FFB347')+'">';
+          html += '<input type="checkbox" id="bet-'+bet.id+'" onchange="markBetPaidUI(\''+prop.id+'\',\''+bet.id+'\',this.checked)" style="cursor:pointer;width:16px;height:16px" '+(bet.paymentStatus === 'paid' ? 'checked' : '')+'>';
+          html += '<label for="bet-'+bet.id+'" style="flex:1;font-size:9px;cursor:pointer;color:var(--text)">'+bet.bettor+' - $'+bet.amount.toFixed(0)+'</label>';
+          html += '<span style="font-size:9px;color:var(--dim)">'+(bet.paymentStatus === 'paid' ? '✅ PAID' : '⭕ UNPAID')+'</span>';
           html += '</div>';
         });
-        html += '<button onclick="markAllBetsPaidUI(\''+prop.id+'\')" style="font-family:Cinzel,serif;font-size:8px;font-weight:700;width:100%;padding:8px;border-radius:6px;border:1px solid rgba(110,222,126,.4);background:rgba(110,222,126,.12);color:#6EDE7E;cursor:pointer;margin-top:8px">MARK ALL PAID</button>';
+        html += '<button onclick="markAllBetsPaidUI(\''+prop.id+'\')" style="font-family:Cinzel,serif;font-size:9px;font-weight:700;width:100%;padding:8px;border-radius:6px;border:1px solid rgba(110,222,126,.4);background:rgba(110,222,126,.12);color:#6EDE7E;cursor:pointer;margin-top:8px">MARK ALL PAID</button>';
       } else {
         html += '<div style="font-size:9px;color:var(--dim);text-align:center;padding:20px">Only commissioner can manage payments</div>';
       }
       html += '</div>';
       
-      // Action buttons
+      // Teams Tab
+      html += '<div id="propTab-'+prop.id+'-teams" class="propTabContent" style="display:none;margin-bottom:12px">';
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px">';
+      prop.teams.forEach(function(team, idx) {
+        var teamBets = prop.bets.filter(b => b.selectedTeams.includes(team));
+        html += '<div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.3);border-radius:8px;padding:10px;text-align:center;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor=\'var(--gold)\';this.style.background=\'rgba(201,168,76,.12)\'" onmouseout="this.style.borderColor=\'rgba(201,168,76,.3)\';this.style.background=\'rgba(201,168,76,.08)\'">';
+        html += '<div style="font-family:Cinzel,serif;font-size:10px;font-weight:700;color:var(--gold)">'+team+'</div>';
+        html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);margin-top:4px">'+teamBets.length+' bet'+(teamBets.length !== 1 ? 's' : '')+'</div>';
+        html += '</div>';
+      });
+      html += '</div>';
+      html += '</div>';
+      
+      // Action Buttons
       if (me) {
-        html += '<div style="display:flex;gap:8px">';
-        html += '<button onclick="openPlacePropBetPanel(\''+prop.id+'\')" style="flex:1;font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:8px;border-radius:8px;border:1px solid rgba(110,222,126,.4);background:rgba(110,222,126,.12);color:#6EDE7E;cursor:pointer">[PLACE BET]</button>';
-        html += '<button onclick="openAddSideBetPanel(\''+prop.id+'\')" style="flex:1;font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:8px;border-radius:8px;border:1px solid rgba(123,184,232,.3);background:rgba(123,184,232,.1);color:var(--blue);cursor:pointer">[ADD SIDE BET]</button>';
+        html += '<div style="display:flex;gap:10px;margin-top:16px">';
+        html += '<button onclick="openPlacePropBetPanel(\''+prop.id+'\')" style="flex:1;font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:10px;border-radius:8px;border:1px solid rgba(110,222,126,.4);background:rgba(110,222,126,.12);color:#6EDE7E;cursor:pointer;transition:all .2s" onmouseover="this.style.background=\'rgba(110,222,126,.2)\'" onmouseout="this.style.background=\'rgba(110,222,126,.12)\'">PLACE BET</button>';
+        html += '<button onclick="openAddSideBetPanel(\''+prop.id+'\')" style="flex:1;font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:10px;border-radius:8px;border:1px solid rgba(123,184,232,.3);background:rgba(123,184,232,.1);color:var(--blue);cursor:pointer;transition:all .2s" onmouseover="this.style.background=\'rgba(123,184,232,.15)\'" onmouseout="this.style.background=\'rgba(123,184,232,.1)\'">SIDE BET</button>';
         html += '</div>';
       }
       
-      html += '</div>';
       html += '</div>';
     });
     html += '</div>';
@@ -8326,15 +8335,10 @@ if ('serviceWorker' in navigator) {
           </div>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div>
-          <label style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:1px">MIN STAKE ($)</label>
-          <input id="potMinStake" type="number" value="5" min="1" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--gold-border);background:rgba(0,0,0,.3);color:var(--text);font-family:Cinzel,serif;font-size:10px;box-sizing:border-box;outline:none;margin-top:4px">
-        </div>
-        <div>
-          <label style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:1px">MAX STAKE ($)</label>
-          <input id="potMaxStake" type="number" value="500" min="1" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--gold-border);background:rgba(0,0,0,.3);color:var(--text);font-family:Cinzel,serif;font-size:10px;box-sizing:border-box;outline:none;margin-top:4px">
-        </div>
+      <div>
+        <label style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);letter-spacing:1px">STAKE RANGE ($)</label>
+        <input id="potMinStake" type="number" value="5" min="1" placeholder="Min" style="width:48%;padding:8px 12px;border-radius:8px;border:1px solid var(--gold-border);background:rgba(0,0,0,.3);color:var(--text);font-family:Cinzel,serif;font-size:10px;box-sizing:border-box;outline:none;margin-top:4px;margin-right:2%">
+        <input id="potMaxStake" type="number" value="500" min="1" placeholder="Max" style="width:48%;padding:8px 12px;border-radius:8px;border:1px solid var(--gold-border);background:rgba(0,0,0,.3);color:var(--text);font-family:Cinzel,serif;font-size:10px;box-sizing:border-box;outline:none;margin-top:4px">
       </div>
       <button onclick="submitCreatePot()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 16px;border-radius:8px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer;margin-top:8px">CREATE POT</button>
     </div>
