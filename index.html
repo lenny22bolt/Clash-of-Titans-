@@ -7182,7 +7182,7 @@ function buildSleeperTransactionSummary() {
   return lines.join('\n');
 }
 
-// ── SIDE POTS RENDERER ────────────────────────────────────────────────────────
+// ── SIDE POTS RENDERER (PROP BETTING FOCUSED) ────────────────────────────────
 async function renderSidePots() {
   var wrap = document.getElementById('sidepotswrap');
   if (!wrap) return;
@@ -7198,7 +7198,7 @@ async function renderSidePots() {
   // Tabs
   html += '<div style="display:flex;gap:10px;margin-bottom:24px;border-bottom:1px solid rgba(201,168,76,.2);padding-bottom:10px">';
   html += '<button onclick="switchPotTab(\'props\',this)" class="potTabBtn on" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:8px 16px;border:none;background:transparent;color:var(--gold);cursor:pointer;border-bottom:2px solid var(--gold);text-transform:uppercase">🎯 PROP BETTING</button>';
-  html += '<button onclick="switchPotTab(\'sidepots\',this)" class="potTabBtn" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:8px 16px;border:none;background:transparent;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;text-transform:uppercase">💰 SIDE POTS</button>';
+  html += '<button onclick="switchPotTab(\'sidepots\',this)" class="potTabBtn" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:8px 16px;border:none;background:transparent;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;text-transform:uppercase">💰 CLASSIC POTS</button>';
   html += '</div>';
 
   // PROP BETTING TAB
@@ -7206,12 +7206,12 @@ async function renderSidePots() {
   html += renderPropBetting(me);
   html += '</div>';
 
-  // SIDE POTS TAB
+  // CLASSIC POTS TAB
   html += '<div id="potTab-sidepots" class="potTabContent" style="display:none">';
   
   // Create Pot button for signed-in manager
   if (me) {
-    html += '<button onclick="openCreatePotPanel()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:14px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer;margin-bottom:24px">+ CREATE NEW POT</button>';
+    html += '<button onclick="openCreatePotPanel()" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;letter-spacing:1px;padding:10px 20px;border-radius:14px;border:1px solid var(--gold-border);background:rgba(201,168,76,.12);color:var(--gold);cursor:pointer;margin-bottom:24px">+ CREATE CLASSIC POT</button>';
   }
 
   // Active pots
