@@ -2862,15 +2862,100 @@ var CURRENT_PROP_ID = null;
 
 // Initialize prop betting
 function initPropBetting() {
-  // Load from localStorage if exists
-  var stored = localStorage.getItem('clash_prop_bets');
-  if (stored) {
-    try {
-      PROP_BETS = JSON.parse(stored);
-    } catch(e) {
-      PROP_BETS = [];
-    }
-  }
+  // FORCE CLEAR OLD DATA - regenerate fresh props
+  localStorage.removeItem('clash_prop_bets');
+  
+  var timestamp = Date.now();
+  
+  // 1. SEASON CHAMPIONSHIP (All 16 teams)
+  var champProp = {
+    id: 'prop-champ-' + timestamp,
+    title: '🏆 Season 2 Championship Winner',
+    type: 'season_championship',
+    teams: ['Son of Rander', 'Heir of Zeus', 'Orion Leaf', 'Fenrir\'s Fury', 'Wrath of Moctezuma', 'Beercules the Destroyer', 'Talon', 'Warrior Shohei Goatani', 'Stefanos the Spartan King', 'Notchotaur', 'IceMonkey', 'Lord of Dreams', 'ChatG-TDs', 'Dewie Slayer of Bakunawa', 'Lord Jefita Clapper'],
+    bets: [
+      { id: 'bet-champ-1', propId: 'prop-champ-' + timestamp, bettor: 'Team A', selectedTeams: ['Heir of Zeus'], betType: 'matchup_1way', amount: 100, paymentStatus: 'unpaid', paidDate: null, paidBy: null, markedPaidBy: null, markedPaidDate: null, notes: '', sidePots: [] },
+      { id: 'bet-champ-2', propId: 'prop-champ-' + timestamp, bettor: 'Team B', selectedTeams: ['Son of Rander'], betType: 'matchup_1way', amount: 75, paymentStatus: 'unpaid', paidDate: null, paidBy: null, markedPaidBy: null, markedPaidDate: null, notes: '', sidePots: [] }
+    ],
+    sidePots: [],
+    status: 'active',
+    createdDate: new Date().toISOString(),
+    lockDate: null,
+    settleDate: null
+  };
+  
+  // 2. RUNIC NORTH DIVISION WINNER
+  var celestialNorthProp = {
+    id: 'prop-rn-' + timestamp,
+    title: '❄️ Runic North Division Winner',
+    type: 'division_winner',
+    teams: ['IceMonkey', 'Fenrir\'s Fury', 'Warrior Shohei Goatani', 'Orion Leaf'],
+    bets: [],
+    sidePots: [],
+    status: 'active',
+    createdDate: new Date().toISOString(),
+    lockDate: null,
+    settleDate: null
+  };
+  
+  // 3. CELESTIAL SOUTH DIVISION WINNER
+  var celestialSouthProp = {
+    id: 'prop-cs-' + timestamp,
+    title: '☀️ Celestial South Division Winner',
+    type: 'division_winner',
+    teams: ['Hermes Hail Marys', 'Wrath of Moctezuma', 'Beercules the Destroyer', 'Stefanos the Spartan King'],
+    bets: [],
+    sidePots: [],
+    status: 'active',
+    createdDate: new Date().toISOString(),
+    lockDate: null,
+    settleDate: null
+  };
+  
+  // 4. ETHEREAL EAST DIVISION WINNER
+  var underworldWestProp = {
+    id: 'prop-ee-' + timestamp,
+    title: '🌿 Ethereal East Division Winner',
+    type: 'division_winner',
+    teams: ['Lord of Dreams', 'Notchotaur', 'Lord Jefita Clapper', 'Talon'],
+    bets: [],
+    sidePots: [],
+    status: 'active',
+    createdDate: new Date().toISOString(),
+    lockDate: null,
+    settleDate: null
+  };
+  
+  // 5. PRIMORDIAL WEST DIVISION WINNER
+  var underworldEastProp = {
+    id: 'prop-pw-' + timestamp,
+    title: '🌋 Primordial West Division Winner',
+    type: 'division_winner',
+    teams: ['ChatG-TDs', 'Dewie Slayer of Bakunawa', 'Son of Rander', 'Heir of Zeus'],
+    bets: [],
+    sidePots: [],
+    status: 'active',
+    createdDate: new Date().toISOString(),
+    lockDate: null,
+    settleDate: null
+  };
+  
+  // 6. WEEK 1 - HIGHEST SCORING TEAM (Sample weekly prop)
+  var week1Prop = {
+    id: 'prop-w1-' + timestamp,
+    title: '📊 Week 1 - Highest Scoring Team',
+    type: 'weekly_high_score',
+    teams: ['Son of Rander', 'Heir of Zeus', 'Orion Leaf', 'Fenrir\'s Fury'],
+    bets: [],
+    sidePots: [],
+    status: 'active',
+    createdDate: new Date().toISOString(),
+    lockDate: null,
+    settleDate: null
+  };
+  
+  PROP_BETS = [champProp, celestialNorthProp, celestialSouthProp, underworldWestProp, underworldEastProp, week1Prop];
+  localStorage.setItem('clash_prop_bets', JSON.stringify(PROP_BETS));
 }
 
 // Create new prop
@@ -7567,11 +7652,11 @@ function renderPropBetting(me) {
   
   // Add new prop button for commissioner
   if (me && me.name === 'Heir of Zeus') {
-    html += '<button onclick="openCreatePropPanel()" style="font-family:Cinzel,serif;font-size:11px;font-weight:700;letter-spacing:1px;padding:12px 24px;border-radius:10px;border:2px solid var(--gold);background:rgba(201,168,76,.15);color:var(--gold);cursor:pointer;margin-bottom:30px;transition:all .2s;hover:box-shadow:0 0 20px rgba(201,168,76,.3)">+ CREATE NEW PROP BET</button>';
+    html += '<button onclick="openCreatePropPanel()" style="font-family:Cinzel,serif;font-size:11px;font-weight:700;letter-spacing:2px;padding:14px 28px;border-radius:10px;border:2px solid var(--gold);background:rgba(201,168,76,.15);color:var(--gold);cursor:pointer;margin-bottom:30px;transition:all .2s;text-transform:uppercase">⚔ CREATE NEW PROPHECY</button>';
   }
   
   if (PROP_BETS.length === 0) {
-    html += '<div style="text-align:center;padding:60px 40px;color:var(--dim);font-family:EB Garamond,serif;font-size:14px">No prop bets yet. Create your first one to get started!</div>';
+    html += '<div style="text-align:center;padding:60px 40px;color:var(--dim);font-family:EB Garamond,serif;font-size:16px;border:3px dashed var(--gold);border-radius:12px;background:rgba(201,168,76,.05)">🏛️ <span style="color:var(--gold);font-weight:700">The Prop Arena Awaits</span><br><span style="font-size:13px;margin-top:8px;display:block">Create your first prophecy to begin</span></div>';
     return html;
   }
   
@@ -7585,7 +7670,7 @@ function renderPropBetting(me) {
       var paymentPercent = stats.paidPercent;
       var paymentColor = paymentPercent === 100 ? '#6EDE7E' : paymentPercent >= 50 ? '#FFB347' : '#FF6B6B';
       
-      html += '<div style="background:linear-gradient(135deg,rgba(10,22,40,0.9),rgba(19,32,64,0.9));border:2px solid rgba(201,168,76,.3);border-radius:16px;padding:24px;margin-bottom:20px;box-shadow:0 8px 24px rgba(0,0,0,.4);transition:all .3s">';
+      html += '<div style="background:linear-gradient(135deg,rgba(10,22,40,0.95),rgba(19,32,64,0.95));border:3px solid var(--gold);border-radius:16px;padding:24px;margin-bottom:24px;box-shadow:0 12px 40px rgba(201,168,76,.15),inset 0 1px 0 rgba(255,255,255,.05);position:relative;overflow:hidden">';
       
       // Header
       html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">';
@@ -7611,10 +7696,10 @@ function renderPropBetting(me) {
       html += '</div>';
       
       // Tabs
-      html += '<div style="display:flex;gap:12px;margin-bottom:14px;border-bottom:1px solid rgba(201,168,76,.2);padding-bottom:10px">';
-      html += '<button onclick="switchPropTab(\''+prop.id+'-bets\',this)" class="propTabBtn on" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;padding:6px 14px;border:none;background:transparent;color:var(--gold);cursor:pointer;border-bottom:2px solid var(--gold)">🎯 BETS</button>';
-      html += '<button onclick="switchPropTab(\''+prop.id+'-payments\',this)" class="propTabBtn" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;padding:6px 14px;border:none;background:transparent;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent">💳 PAYMENTS</button>';
-      html += '<button onclick="switchPropTab(\''+prop.id+'-teams\',this)" class="propTabBtn" style="font-family:Cinzel,serif;font-size:10px;font-weight:700;padding:6px 14px;border:none;background:transparent;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent">👥 TEAMS</button>';
+      html += '<div style="display:flex;gap:16px;margin-bottom:18px;border-bottom:2px solid rgba(201,168,76,.3);padding-bottom:12px">';
+      html += '<button onclick="switchPropTab(\''+prop.id+'-bets\',this)" class="propTabBtn on" style="font-family:Cinzel,serif;font-size:11px;font-weight:700;letter-spacing:1px;padding:8px 16px;border:none;background:transparent;color:var(--gold);cursor:pointer;border-bottom:3px solid var(--gold);text-transform:uppercase;transition:all .2s" onmouseover="this.style.color=\'#FFD580\'" onmouseout="this.style.color=\'var(--gold)\'">📜 Prophecies</button>';
+      html += '<button onclick="switchPropTab(\''+prop.id+'-payments\',this)" class="propTabBtn" style="font-family:Cinzel,serif;font-size:11px;font-weight:700;letter-spacing:1px;padding:8px 16px;border:none;background:transparent;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;text-transform:uppercase;transition:all .2s" onmouseover="this.style.color=\'rgba(201,168,76,.8)\'" onmouseout="this.style.color=\'var(--dim)\'">💳 Settlements</button>';
+      html += '<button onclick="switchPropTab(\''+prop.id+'-teams\',this)" class="propTabBtn" style="font-family:Cinzel,serif;font-size:11px;font-weight:700;letter-spacing:1px;padding:8px 16px;border:none;background:transparent;color:var(--dim);cursor:pointer;border-bottom:2px solid transparent;text-transform:uppercase;transition:all .2s" onmouseover="this.style.color=\'rgba(201,168,76,.8)\'" onmouseout="this.style.color=\'var(--dim)\'">⚔️ Contenders</button>';
       html += '</div>';
       
       // Bets Tab
@@ -7656,14 +7741,38 @@ function renderPropBetting(me) {
       }
       html += '</div>';
       
-      // Teams Tab
+      // Teams Tab with Crests
       html += '<div id="propTab-'+prop.id+'-teams" class="propTabContent" style="display:none;margin-bottom:12px">';
-      html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px">';
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px">';
+      
+      var CREST_MAP = {
+        'IceMonkey': 'crest-icemonkey.png',
+        'Fenrir\'s Fury': 'crest-fenrir.png',
+        'Warrior Shohei Goatani': 'crest-warrior.png',
+        'Orion Leaf': 'crest-orion.png',
+        'Hermes Hail Marys': 'crest-hermes.png',
+        'Wrath of Moctezuma': 'crest-moctezuma.png',
+        'Beercules the Destroyer': 'crest-beercules.png',
+        'Stefanos the Spartan King': 'crest-stefanos.png',
+        'Lord of Dreams': 'crest-lordofdreams.png',
+        'Notchotaur': 'crest-notchotaur.png',
+        'Lord Jefita Clapper': 'crest-jefita.png',
+        'Talon': 'crest-talon.png',
+        'ChatG-TDs': 'crest-chatg.png',
+        'Dewie Slayer of Bakunawa': 'crest-dewie.png',
+        'Son of Rander': 'crest-sonrander.png',
+        'Heir of Zeus': 'crest-heirofzeus.png'
+      };
+      
       prop.teams.forEach(function(team, idx) {
         var teamBets = prop.bets.filter(b => b.selectedTeams.includes(team));
-        html += '<div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.3);border-radius:8px;padding:10px;text-align:center;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor=\'var(--gold)\';this.style.background=\'rgba(201,168,76,.12)\'" onmouseout="this.style.borderColor=\'rgba(201,168,76,.3)\';this.style.background=\'rgba(201,168,76,.08)\'">';
-        html += '<div style="font-family:Cinzel,serif;font-size:10px;font-weight:700;color:var(--gold)">'+team+'</div>';
-        html += '<div style="font-family:Cinzel,serif;font-size:9px;color:var(--dim);margin-top:4px">'+teamBets.length+' bet'+(teamBets.length !== 1 ? 's' : '')+'</div>';
+        var crestImg = CREST_MAP[team] || 'crest-default.png';
+        var crestUrl = 'https://lenny22bolt.github.io/Clash-of-Titans-/' + crestImg;
+        
+        html += '<div style="background:linear-gradient(135deg,rgba(201,168,76,.1),rgba(201,168,76,.05));border:2px solid rgba(201,168,76,.3);border-radius:10px;padding:14px;text-align:center;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;justify-content:center" onmouseover="this.style.borderColor=\'var(--gold)\';this.style.background=\'rgba(201,168,76,.15)\';this.style.boxShadow=\'0 0 12px rgba(201,168,76,.2)\'" onmouseout="this.style.borderColor=\'rgba(201,168,76,.3)\';this.style.background=\'rgba(201,168,76,.05)\';this.style.boxShadow=\'none\'">';
+        html += '<img src="'+crestUrl+'" style="width:60px;height:60px;margin-bottom:10px;filter:drop-shadow(0 0 4px rgba(201,168,76,.4));object-fit:contain" alt="'+team+'" onerror="this.outerHTML=\'<span style=&quot;font-size:48px;margin-bottom:10px&quot;>🩴</span>\'">';
+        html += '<div style="font-family:Cinzel,serif;font-size:10px;font-weight:700;color:var(--gold);text-transform:uppercase;line-height:1.2">'+team+'</div>';
+        html += '<div style="font-family:Cinzel,serif;font-size:10px;font-weight:700;color:#FFD580;margin-top:6px">'+teamBets.length+' prophec'+(teamBets.length !== 1 ? 'ies' : 'y')+'</div>';
         html += '</div>';
       });
       html += '</div>';
@@ -7671,9 +7780,8 @@ function renderPropBetting(me) {
       
       // Action Buttons
       if (me) {
-        html += '<div style="display:flex;gap:10px;margin-top:16px">';
-        html += '<button onclick="openPlacePropBetPanel(\''+prop.id+'\')" style="flex:1;font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:10px;border-radius:8px;border:1px solid rgba(110,222,126,.4);background:rgba(110,222,126,.12);color:#6EDE7E;cursor:pointer;transition:all .2s" onmouseover="this.style.background=\'rgba(110,222,126,.2)\'" onmouseout="this.style.background=\'rgba(110,222,126,.12)\'">PLACE BET</button>';
-        html += '<button onclick="openAddSideBetPanel(\''+prop.id+'\')" style="flex:1;font-family:Cinzel,serif;font-size:9px;font-weight:700;padding:10px;border-radius:8px;border:1px solid rgba(123,184,232,.3);background:rgba(123,184,232,.1);color:var(--blue);cursor:pointer;transition:all .2s" onmouseover="this.style.background=\'rgba(123,184,232,.15)\'" onmouseout="this.style.background=\'rgba(123,184,232,.1)\'">SIDE BET</button>';
+        html += '<div style="display:flex;gap:12px;margin-top:18px">';
+        html += '<button onclick="openPlacePropBetPanel(\''+prop.id+'\')" style="flex:1;font-family:Cinzel,serif;font-size:11px;font-weight:700;letter-spacing:1.5px;padding:12px;border-radius:8px;border:2px solid rgba(255,213,128,.5);background:rgba(255,213,128,.12);color:#FFD580;cursor:pointer;transition:all .2s;text-transform:uppercase" onmouseover="this.style.background=\'rgba(255,213,128,.2)\';this.style.boxShadow=\'0 0 16px rgba(255,213,128,.2)\'" onmouseout="this.style.background=\'rgba(255,213,128,.12)\';this.style.boxShadow=\'none\'">📜 PLACE PROPHECY</button>';
         html += '</div>';
       }
       
